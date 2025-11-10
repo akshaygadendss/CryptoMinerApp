@@ -25,6 +25,12 @@ export interface MiningProgress {
   isComplete: boolean;
 }
 
+export interface UserSummary {
+  wallet: string;
+  totalEarnedSum: number;
+  latestSession: User | null;
+}
+
 class API {
   async signup(wallet: string): Promise<User> {
     try {
@@ -53,6 +59,23 @@ class API {
       return response.data.user;
     } catch (error: any) {
       console.error('[API] GetUser error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        url: error.config?.url
+      });
+      throw error;
+    }
+  }
+
+  async getUserSummary(wallet: string): Promise<UserSummary> {
+    try {
+      console.log('[API] GetUserSummary request:', { wallet, url: `${API_URL}/user-summary/${wallet}` });
+      const response = await axios.get(`${API_URL}/user-summary/${wallet}`);
+      console.log('[API] GetUserSummary response:', response.data);
+      return response.data as UserSummary;
+    } catch (error: any) {
+      console.error('[API] GetUserSummary error:', {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status,

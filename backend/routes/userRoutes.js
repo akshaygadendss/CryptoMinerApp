@@ -53,7 +53,8 @@ router.post('/signup', async (req, res) => {
 router.get('/user/:wallet', async (req, res) => {
   try {
     const { wallet } = req.params;
-    const user = await User.findOne({ wallet });
+    // Return the most recent session document for this wallet
+    const user = await User.findOne({ wallet }).sort({ createdDate: -1, lastUpdated: -1 });
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -65,34 +66,82 @@ router.get('/user/:wallet', async (req, res) => {
   }
 });
 
+// Get summary for a wallet: total earned across sessions and latest session
+router.get('/user-summary/:wallet', async (req, res) => {
+  try {
+    const { wallet } = req.params;
+
+    // Sum totalEarned across all claimed sessions
+    const aggregation = await User.aggregate([
+      { $match: { wallet } },
+      {
+        $group: {
+          _id: '$wallet',
+          totalEarnedSum: { $sum: '$totalEarned' }
+        }
+      }
+    ]);
+
+    const totalEarnedSum = aggregation.length > 0 ? aggregation[0].totalEarnedSum : 0;
+
+    const latestSession = await User.findOne({ wallet }).sort({ createdDate: -1, lastUpdated: -1 });
+
+    res.status(200).json({
+      wallet,
+      totalEarnedSum,
+      latestSession
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.post('/start-mining', async (req, res) => {
   try {
     console.log('[START-MINING] Request received:', req.body);
     const { wallet, selectedHour, multiplier } = req.body;
 
     console.log('[START-MINING] Finding user:', wallet);
-    const user = await User.findOne({ wallet });
-    if (!user) {
-      console.log('[START-MINING] User not found:', wallet);
-      return res.status(404).json({ error: 'User not found' });
+    // Prevent starting a new session if there is an active one
+    const activeSession = await User.findOne({ 
+      wallet, 
+      status: { $in: ['mining', 'ready_to_claim'] } 
+    }).sort({ lastUpdated: -1 });
+
+    if (activeSession) {
+      console.log('[START-MINING] Active session already exists for wallet:', wallet);
+      return res.status(400).json({ error: 'An active session already exists. Claim or wait for completion.' });
     }
 
-    console.log('[START-MINING] User found, updating mining status...');
-    const now = new Date();
-    user.status = 'mining';
-    user.miningStartTime = now;
-    user.currentMultiplierStartTime = now;
-    user.selectedHour = selectedHour || 1;
-    user.multiplier = multiplier || 1;
-    user.currentMiningPoints = 0;
-    user.lastUpdated = now;
+    // Ensure wallet is registered in MinerUser
+    const minerUser = await MinerUser.findOne({ walletId: wallet });
+    if (!minerUser) {
+      console.log('[START-MINING] MinerUser not found for wallet:', wallet);
+      return res.status(404).json({ error: 'User not registered' });
+    }
 
-    await user.save();
-    console.log('[START-MINING] Mining started successfully for user:', user._id);
+    console.log('[START-MINING] Creating new mining session document...');
+    const now = new Date();
+
+    const session = new User({
+      wallet,
+      createdDate: now,
+      status: 'mining',
+      miningStartTime: now,
+      currentMultiplierStartTime: now,
+      selectedHour: selectedHour || 1,
+      multiplier: multiplier || 1,
+      currentMiningPoints: 0,
+      totalEarned: 0,
+      lastUpdated: now
+    });
+
+    await session.save();
+    console.log('[START-MINING] Mining session created successfully:', session._id);
 
     res.status(200).json({ 
       message: 'Mining started successfully', 
-      user 
+      user: session 
     });
   } catch (error) {
     console.error('[START-MINING] Error:', error.message);
@@ -105,7 +154,14 @@ router.post('/calculate-progress', async (req, res) => {
   try {
     const { wallet } = req.body;
 
-    const user = await User.findOne({ wallet });
+    // Prefer the latest active session; otherwise, fall back to the latest session
+    let user = await User.findOne({ wallet, status: { $in: ['mining', 'ready_to_claim'] } })
+      .sort({ lastUpdated: -1, createdDate: -1 });
+
+    if (!user) {
+      user = await User.findOne({ wallet }).sort({ createdDate: -1, lastUpdated: -1 });
+    }
+
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -169,11 +225,13 @@ router.post('/claim-reward', async (req, res) => {
   try {
     const { wallet } = req.body;
 
-    const user = await User.findOne({ wallet });
+    const user = await User.findOne({ wallet, status: 'ready_to_claim' }).sort({ lastUpdated: -1 });
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // If not ready_to_claim, no rewards to claim
+    // (findOne above already filters, but leave guard if logic changes)
     if (user.status !== 'ready_to_claim') {
       return res.status(400).json({ error: 'No rewards to claim' });
     }

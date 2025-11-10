@@ -12,7 +12,7 @@ import {
   Animated,
 } from 'react-native';
 import { COLORS, DURATION_OPTIONS, MINING_RATES } from '../constants/mining';
-import api, { User } from '../services/api';
+import api, { User, UserSummary } from '../services/api';
 import { AnimatedBackground } from '../components/AnimatedBackground';
 
 interface HomeScreenProps {
@@ -22,6 +22,7 @@ interface HomeScreenProps {
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [totalBalance, setTotalBalance] = useState<number>(0);
   const [showDurationModal, setShowDurationModal] = useState(false);
   const [selectedHour, setSelectedHour] = useState(1);
   const [balanceAnim] = useState(new Animated.Value(1));
@@ -118,6 +119,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       const userData = await api.getUser(wallet);
       console.log('[HomeScreen] User data loaded:', userData);
       setUser(userData);
+      try {
+        const summary: UserSummary = await api.getUserSummary(wallet);
+        setTotalBalance(summary.totalEarnedSum || 0);
+      } catch (e) {
+        console.warn('[HomeScreen] Failed to fetch summary, fallback to latest user.totalEarned');
+        setTotalBalance(userData?.totalEarned || 0);
+      }
     } catch (error: any) {
       console.error('[HomeScreen] Failed to load user data:', {
         message: error.message,
@@ -286,7 +294,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             </View>
             <Text style={styles.balanceLabel}>TOTAL BALANCE</Text>
             <Text style={styles.balanceAmount}>
-              {user?.totalEarned.toFixed(4) || '0.0000'}
+              {totalBalance.toFixed(4)}
             </Text>
             <Text style={styles.balanceUnit}>TOKENS</Text>
           </View>
