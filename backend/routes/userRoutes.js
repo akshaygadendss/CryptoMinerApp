@@ -53,8 +53,16 @@ router.post('/signup', async (req, res) => {
 router.get('/user/:wallet', async (req, res) => {
   try {
     const { wallet } = req.params;
-    // Return the most recent session document for this wallet
-    const user = await User.findOne({ wallet }).sort({ createdDate: -1, lastUpdated: -1 });
+    // Prioritize active sessions (mining or ready_to_claim), then fall back to most recent
+    let user = await User.findOne({ 
+      wallet, 
+      status: { $in: ['mining', 'ready_to_claim'] } 
+    }).sort({ lastUpdated: -1, createdDate: -1 });
+
+    if (!user) {
+      // Fall back to most recent session if no active session
+      user = await User.findOne({ wallet }).sort({ createdDate: -1, lastUpdated: -1 });
+    }
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -109,8 +117,17 @@ router.post('/start-mining', async (req, res) => {
     }).sort({ lastUpdated: -1 });
 
     if (activeSession) {
-      console.log('[START-MINING] Active session already exists for wallet:', wallet);
-      return res.status(400).json({ error: 'An active session already exists. Claim or wait for completion.' });
+      console.log('[START-MINING] Active session already exists for wallet:', wallet, 'Status:', activeSession.status);
+      if (activeSession.status === 'ready_to_claim') {
+        return res.status(400).json({ 
+          error: 'Please claim your previous mining rewards before starting a new session.',
+          status: 'ready_to_claim'
+        });
+      }
+      return res.status(400).json({ 
+        error: 'An active mining session is already in progress.',
+        status: activeSession.status
+      });
     }
 
     // Ensure wallet is registered in MinerUser

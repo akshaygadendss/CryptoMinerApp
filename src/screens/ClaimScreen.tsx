@@ -68,6 +68,11 @@ const ClaimScreen: React.FC<ClaimScreenProps> = ({ navigation }) => {
         navigation.replace('Signup');
         return;
       }
+      
+      // Calculate progress first to ensure currentMiningPoints is updated
+      console.log('[ClaimScreen] Calculating final progress for wallet:', wallet);
+      await api.calculateProgress(wallet);
+      
       console.log('[ClaimScreen] Fetching user data for wallet:', wallet);
       const userData = await api.getUser(wallet);
       console.log('[ClaimScreen] User data loaded:', userData);
@@ -177,10 +182,13 @@ const ClaimScreen: React.FC<ClaimScreenProps> = ({ navigation }) => {
         >
           <View style={styles.rewardHeader}>
             <Text style={styles.rewardIcon}>✨</Text>
-            <Text style={styles.rewardLabel}>TOTAL EARNED</Text>
+            <Text style={styles.rewardLabel}>SESSION EARNINGS</Text>
           </View>
           <Text style={styles.rewardAmount}>
             {user.currentMiningPoints.toFixed(4)} TOKENS
+          </Text>
+          <Text style={styles.sessionInfo}>
+            Earned in this mining session
           </Text>
         </Animated.View>
 
@@ -286,6 +294,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: COLORS.text,
     textAlign: 'center',
+  },
+  sessionInfo: {
+    fontSize: 12,
+    color: COLORS.textLight,
+    textAlign: 'center',
+    marginTop: 8,
+    opacity: 0.8,
   },
   claimButton: {
     backgroundColor: COLORS.orange,

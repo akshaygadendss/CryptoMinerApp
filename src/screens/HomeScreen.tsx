@@ -143,7 +143,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     if (user?.status === 'mining') {
       navigation.navigate('Mining');
     } else if (user?.status === 'ready_to_claim') {
-      navigation.navigate('Claim');
+      Alert.alert(
+        'Unclaimed Rewards',
+        'You have unclaimed rewards from your previous mining session. Please claim them before starting a new session.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Claim Now', onPress: () => navigation.navigate('Claim') }
+        ]
+      );
     } else {
       setShowDurationModal(true);
     }
