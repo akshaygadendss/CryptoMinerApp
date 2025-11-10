@@ -20,7 +20,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [showDurationModal, setShowDurationModal] = useState(false);
+  const [showMultiplierModal, setShowMultiplierModal] = useState(false);
   const [selectedHour, setSelectedHour] = useState(1);
+  const [selectedMultiplier, setSelectedMultiplier] = useState(1);
 
   useEffect(() => {
     loadUserData();
@@ -62,19 +64,24 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
+  const handleDurationNext = () => {
+    setShowDurationModal(false);
+    setShowMultiplierModal(true);
+  };
+
   const confirmMining = async () => {
     if (!user) return;
     
-    setShowDurationModal(false);
+    setShowMultiplierModal(false);
     setLoading(true);
     
     try {
       console.log('[HomeScreen] Starting mining:', {
         wallet: user.wallet,
         selectedHour,
-        multiplier: 1 // Default to 1x
+        multiplier: selectedMultiplier
       });
-      await api.startMining(user.wallet, selectedHour, 1); // Always start with 1x multiplier
+      await api.startMining(user.wallet, selectedHour, selectedMultiplier);
       console.log('[HomeScreen] Mining started successfully, navigating to Mining screen');
       navigation.navigate('Mining');
     } catch (error: any) {
@@ -161,8 +168,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Select Mining Duration</Text>
-            <Text style={styles.modalSubtitle}>Mining will start at 1× multiplier</Text>
-            <Text style={styles.modalInfo}>You can upgrade multiplier during mining by watching ads</Text>
+            <Text style={styles.modalSubtitle}>Choose how long you want to mine</Text>
             
             <ScrollView style={styles.optionsList}>
               {DURATION_OPTIONS.map((option) => (
@@ -174,10 +180,22 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                   ]}
                   onPress={() => setSelectedHour(option.value)}
                 >
-                  <Text style={styles.optionText}>{option.label}</Text>
-                  <Text style={styles.optionReward}>
-                    {(MINING_RATES[1].hourlyReward * option.value).toFixed(2)} tokens
-                  </Text>
+                  <View style={styles.optionLeft}>
+                    <Text style={[
+                      styles.optionText,
+                      selectedHour === option.value && styles.optionTextSelected
+                    ]}>
+                      {option.label}
+                    </Text>
+                  </View>
+                  <View style={styles.optionRight}>
+                    <Text style={[
+                      styles.optionReward,
+                      selectedHour === option.value && styles.optionRewardSelected
+                    ]}>
+                      {(MINING_RATES[1].hourlyReward * option.value).toFixed(0)} tokens
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -188,6 +206,84 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 onPress={() => setShowDurationModal(false)}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.confirmButton]}
+                onPress={handleDurationNext}
+              >
+                <Text style={styles.confirmButtonText}>Next</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Multiplier Selection Modal */}
+      <Modal
+        visible={showMultiplierModal}
+        transparent={true}
+        animationType="slide"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select Multiplier</Text>
+            <Text style={styles.modalSubtitle}>
+              Higher multipliers earn more tokens per hour
+            </Text>
+            <Text style={styles.modalInfo}>
+              💡 You can upgrade multiplier later by watching ads
+            </Text>
+            
+            <ScrollView style={styles.multiplierList}>
+              {[1, 2, 3, 4, 5, 6].map((mult) => (
+                <TouchableOpacity
+                  key={mult}
+                  style={[
+                    styles.multiplierCard,
+                    selectedMultiplier === mult && styles.multiplierCardSelected
+                  ]}
+                  onPress={() => setSelectedMultiplier(mult)}
+                >
+                  <View style={styles.multiplierHeader}>
+                    <View style={styles.multiplierBadge}>
+                      <Text style={styles.multiplierBadgeText}>{mult}×</Text>
+                    </View>
+                    {selectedMultiplier === mult && (
+                      <View style={styles.selectedIndicator}>
+                        <Text style={styles.selectedIndicatorText}>✓</Text>
+                      </View>
+                    )}
+                  </View>
+                  
+                  <View style={styles.multiplierBody}>
+                    <Text style={styles.multiplierRate}>
+                      {MINING_RATES[mult].hourlyReward.toFixed(0)} tokens/hour
+                    </Text>
+                    <Text style={styles.multiplierTotal}>
+                      Total: {(MINING_RATES[mult].hourlyReward * selectedHour).toFixed(0)} tokens
+                    </Text>
+                  </View>
+
+                  {mult > 1 && (
+                    <View style={styles.adRequirement}>
+                      <Text style={styles.adRequirementText}>
+                        🎬 Requires watching ad
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setShowMultiplierModal(false);
+                  setShowDurationModal(true);
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Back</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalButton, styles.confirmButton]}
@@ -370,18 +466,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
   optionItemSelected: {
     backgroundColor: COLORS.primary,
+    borderColor: COLORS.secondary,
+  },
+  optionLeft: {
+    flex: 1,
+  },
+  optionRight: {
+    alignItems: 'flex-end',
   },
   optionText: {
     fontSize: 18,
     fontWeight: '600',
     color: COLORS.text,
   },
+  optionTextSelected: {
+    color: '#FFFFFF',
+  },
   optionReward: {
     fontSize: 14,
     color: COLORS.textLight,
+    fontWeight: '600',
+  },
+  optionRewardSelected: {
+    color: '#FFFFFF',
   },
   modalButtons: {
     flexDirection: 'row',
