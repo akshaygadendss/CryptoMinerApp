@@ -263,10 +263,25 @@ router.post('/upgrade-multiplier', async (req, res) => {
       return res.status(400).json({ error: 'Wallet and newMultiplier are required' });
     }
 
-    const user = await User.findOne({ wallet });
+    // Check if user is registered
+    const minerUser = await MinerUser.findOne({ walletId: wallet });
+    if (!minerUser) {
+      console.log('[UPGRADE-MULTIPLIER] MinerUser not found:', wallet);
+      return res.status(404).json({ error: 'User not registered' });
+    }
+
+    // Find the latest active mining session
+    const user = await User.findOne({ 
+      wallet, 
+      status: { $in: ['mining', 'ready_to_claim'] } 
+    }).sort({ lastUpdated: -1 });
+
     if (!user) {
-      console.log('[UPGRADE-MULTIPLIER] User not found:', wallet);
-      return res.status(404).json({ error: 'User not found' });
+      console.log('[UPGRADE-MULTIPLIER] No active mining session found:', wallet);
+      return res.status(400).json({ 
+        error: 'No active mining session',
+        message: 'Please start a mining session before upgrading multiplier'
+      });
     }
 
     const currentMultiplier = user.multiplier || 1;
