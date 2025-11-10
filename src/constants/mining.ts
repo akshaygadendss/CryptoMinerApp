@@ -16,14 +16,27 @@ export const DURATION_OPTIONS = [
 ];
 
 export const COLORS = {
-  primary: '#0b0b0bff',
-  secondary: '#F5A623',
-  background: '#E8F4F8',
-  cardBg: '#FFFFFF',
-  text: '#2C3E50',
-  textLight: '#7F8C8D',
-  success: '#27AE60',
-  warning: '#F39C12',
+  // Primary colors from figmadesign
+  primary: '#22D3EE', // Cyan primary
+  secondary: '#FB923C', // Orange secondary
+  background: '#1E3A5F', // Dark blue background
+  cardBg: '#2A3F5F', // Card background
+  darkCard: '#1E293B', // Darker card
+  text: '#FFFFFF', // White text
+  textLight: '#67E8F9', // Light cyan (cyan-200)
+  success: '#FB923C', // Green
+  warning: '#FCD34D', // Yellow
   danger: '#E74C3C',
   bitcoin: '#F7931A',
+  // Additional colors from figmadesign
+  cyan: '#22D3EE',
+  cyanLight: '#67E8F9',
+  orange: '#FB923C',
+  orangeLight: '#FDBA74',
+  yellow: '#FCD34D',
+  yellowLight: '#FDE68A',
+  green: '#10B981',
+  greenLight: '#34D399',
+  slate: '#334155',
+  slateDark: '#1E293B',
 };

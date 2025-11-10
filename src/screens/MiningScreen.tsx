@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { COLORS, MINING_RATES } from '../constants/mining';
 import api, { MiningProgress } from '../services/api';
+import { AnimatedBackground } from '../components/AnimatedBackground';
 
 interface MiningScreenProps {
   navigation: any;
@@ -29,10 +30,24 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
   const [showMultiplierModal, setShowMultiplierModal] = useState(false);
   const [loadingAd, setLoadingAd] = useState(false);
   const progressAnim = useRef(new Animated.Value(0)).current;
+  const pickaxeAnim = useRef(new Animated.Value(0)).current;
+  const tokensAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     loadWalletAndProgress();
     const interval = setInterval(updateProgress, 1000);
+    
+    // Animate pickaxe
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pickaxeAnim, {
+          toValue: 1,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+    
     return () => clearInterval(interval);
   }, []);
 
@@ -42,6 +57,20 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
       duration: 500,
       useNativeDriver: false,
     }).start();
+
+    // Animate tokens
+    Animated.sequence([
+      Animated.timing(tokensAnim, {
+        toValue: 1.2,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(tokensAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
 
     if (progress.isComplete) {
       navigation.replace('Claim');
@@ -116,9 +145,6 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
       }
 
       // Simulate ad loading/watching
-      // In production, integrate with Google AdMob:
-      // import { RewardedAd, RewardedAdEventType, TestIds } from 'react-native-google-mobile-ads';
-      
       await new Promise<void>(resolve => setTimeout(() => resolve(), 2000)); // Simulate ad duration
 
       // After ad is watched, upgrade multiplier
@@ -158,73 +184,120 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
 
   const canUpgrade = currentMultiplier < 6;
 
+  const pickaxeRotation = pickaxeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['-15deg', '15deg'],
+  });
+
+  const pickaxeTranslateY = pickaxeAnim.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0, -5, 0],
+  });
+
   return (
     <View style={styles.container}>
+      <AnimatedBackground />
+      
       <View style={styles.content}>
-        <Text style={styles.title}>Mining in Progress</Text>
+        <Text style={styles.title}>MINING IN PROGRESS</Text>
 
-        <View style={styles.miningCard}>
-          <Text style={styles.tokensLabel}>Tokens Mined</Text>
-          <Text style={styles.tokensAmount}>
-            {progress.currentPoints.toFixed(4)}
+        {/* Mining Animation */}
+        <View style={styles.miningAnimationContainer}>
+          <Animated.View
+            style={[
+              styles.pickaxeContainer,
+              {
+                transform: [
+                  { rotate: pickaxeRotation },
+                  { translateY: pickaxeTranslateY },
+                ],
+              },
+            ]}
+          >
+            <View style={styles.pickaxeIcon}>
+              <Text style={styles.pickaxeText}>⛏️</Text>
+            </View>
+          </Animated.View>
+        </View>
+
+        {/* Mining Info Card */}
+        <View style={styles.infoCard}>
+          <View style={styles.infoHeader}>
+            <Text style={styles.infoIcon}>⏱️</Text>
+            <Text style={styles.infoLabel}>TIME REMAINING</Text>
+          </View>
+          <Text style={styles.timeText}>
+            {formatTime(progress.timeRemaining)}
           </Text>
 
-          <View style={styles.multiplierBadge}>
-            <Text style={styles.multiplierText}>{currentMultiplier}× Multiplier</Text>
+          {/* Progress Bar */}
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBarBackground}>
+              <Animated.View
+                style={[
+                  styles.progressBarFill,
+                  {
+                    width: progressAnim.interpolate({
+                      inputRange: [0, 100],
+                      outputRange: ['0%', '100%'],
+                    }),
+                  },
+                ]}
+              />
+            </View>
+            <Text style={styles.progressText}>
+              {progress.progress.toFixed(1)}% COMPLETE
+            </Text>
           </View>
 
-          <View style={styles.progressBarContainer}>
-            <Animated.View
+          {/* Mined Tokens */}
+          <View style={styles.tokensCard}>
+            <View style={styles.tokensHeader}>
+              <Text style={styles.tokensIcon}>🪙</Text>
+              <Text style={styles.tokensLabel}>TOKENS MINED</Text>
+            </View>
+            <Animated.Text
               style={[
-                styles.progressBarFill,
+                styles.tokensAmount,
                 {
-                  width: progressAnim.interpolate({
-                    inputRange: [0, 100],
-                    outputRange: ['0%', '100%'],
-                  }),
+                  transform: [{ scale: tokensAnim }],
                 },
               ]}
-            />
-          </View>
-          <Text style={styles.progressText}>
-            {progress.progress.toFixed(1)}% Complete
-          </Text>
-        </View>
-
-        <View style={styles.timeCard}>
-          <View style={styles.timeRow}>
-            <Text style={styles.timeLabel}>Time Elapsed</Text>
-            <Text style={styles.timeValue}>{formatTime(progress.timeElapsed)}</Text>
-          </View>
-          <View style={styles.timeRow}>
-            <Text style={styles.timeLabel}>Time Remaining</Text>
-            <Text style={styles.timeValue}>{formatTime(progress.timeRemaining)}</Text>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.timeRow}>
-            <Text style={styles.timeLabel}>Mining Rate</Text>
-            <Text style={styles.rateValue}>
-              {MINING_RATES[currentMultiplier].hourlyReward.toFixed(2)} tokens/hr
-            </Text>
+            >
+              {progress.currentPoints.toFixed(4)} TOKENS
+            </Animated.Text>
           </View>
         </View>
 
-        {canUpgrade && (
-          <TouchableOpacity
-            style={styles.upgradeButton}
-            onPress={handleUpgradeMultiplier}
-          >
-            <Text style={styles.upgradeButtonText}>
-              🚀 Upgrade Multiplier (Watch Ad)
-            </Text>
-          </TouchableOpacity>
-        )}
+        {/* Mining Stats */}
+        <View style={styles.statsCard}>
+          <View style={styles.statsRow}>
+            <TouchableOpacity
+              style={styles.statItem}
+              activeOpacity={0.8}
+              onPress={handleUpgradeMultiplier}
+            >
+              <Text style={styles.statLabel}>MULTIPLIER</Text>
+              <Text style={styles.statValue}>{currentMultiplier}×</Text>
+              {canUpgrade && (
+                <Text style={styles.statHint}>Tap to upgrade</Text>
+              )}
+            </TouchableOpacity>
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>RATE</Text>
+              <Text style={styles.statValue}>
+                {MINING_RATES[currentMultiplier].rate.toFixed(4)}/sec
+              </Text>
+            </View>
+          </View>
+        </View>
 
         <TouchableOpacity
-          style={styles.backButton}
+          style={styles.homeButton}
           onPress={() => navigation.navigate('Home')}
         >
-          <Text style={styles.backButtonText}>Back to Home</Text>
+          <Text style={styles.homeButtonIcon}>🏠</Text>
+          <Text style={styles.homeButtonText}>Back to Home</Text>
         </TouchableOpacity>
       </View>
 
@@ -316,131 +389,189 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 20,
+    padding: 16,
     justifyContent: 'center',
+    zIndex: 10,
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: COLORS.primary,
+    color: COLORS.cyan,
     textAlign: 'center',
-    marginBottom: 30,
+    marginBottom: 32,
   },
-  miningCard: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 16,
-    padding: 30,
-    marginBottom: 20,
+  miningAnimationContainer: {
     alignItems: 'center',
-    elevation: 4,
+    marginBottom: 32,
+  },
+  pickaxeContainer: {
+    position: 'relative',
+  },
+  pickaxeIcon: {
+    width: 128,
+    height: 128,
+    borderRadius: 64,
+    backgroundColor: COLORS.orange,
+    borderWidth: 4,
+    borderColor: COLORS.orangeLight,
+    justifyContent: 'center',
+    alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
   },
-  tokensLabel: {
-    fontSize: 18,
+  pickaxeText: {
+    fontSize: 64,
+  },
+  infoCard: {
+    backgroundColor: COLORS.cardBg,
+    borderRadius: 24,
+    padding: 24,
+    borderWidth: 4,
+    borderColor: COLORS.cyan,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  infoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  infoIcon: {
+    fontSize: 24,
+    marginRight: 8,
+  },
+  infoLabel: {
+    fontSize: 14,
     color: COLORS.textLight,
-    marginBottom: 10,
+    fontWeight: '600',
   },
-  tokensAmount: {
-    fontSize: 48,
+  timeText: {
+    fontSize: 32,
     fontWeight: 'bold',
-    color: COLORS.bitcoin,
-    marginBottom: 15,
+    color: COLORS.text,
+    textAlign: 'center',
+    marginBottom: 24,
   },
-  multiplierBadge: {
-    backgroundColor: COLORS.secondary,
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    marginBottom: 20,
+  progressContainer: {
+    marginBottom: 24,
   },
-  multiplierText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  progressBarContainer: {
+  progressBarBackground: {
     width: '100%',
-    height: 20,
-    backgroundColor: COLORS.background,
-    borderRadius: 10,
+    height: 24,
+    backgroundColor: COLORS.darkCard,
+    borderRadius: 12,
     overflow: 'hidden',
-    marginBottom: 10,
+    borderWidth: 2,
+    borderColor: COLORS.slate,
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: COLORS.success,
-    borderRadius: 10,
+    backgroundColor: COLORS.cyan,
+    borderRadius: 12,
   },
   progressText: {
-    fontSize: 16,
-    color: COLORS.text,
+    fontSize: 14,
+    color: COLORS.textLight,
+    textAlign: 'center',
+    marginTop: 8,
     fontWeight: '600',
   },
-  timeCard: {
+  tokensCard: {
+    backgroundColor: COLORS.darkCard,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: COLORS.orange,
+  },
+  tokensHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  tokensIcon: {
+    fontSize: 24,
+    marginRight: 8,
+  },
+  tokensLabel: {
+    fontSize: 14,
+    color: COLORS.textLight,
+    fontWeight: '600',
+  },
+  tokensAmount: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: COLORS.text,
+    textAlign: 'center',
+  },
+  statsCard: {
     backgroundColor: COLORS.cardBg,
     borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    elevation: 4,
+    padding: 16,
+    borderWidth: 4,
+    borderColor: COLORS.orange,
+    marginBottom: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  timeRow: {
+  statsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
+    justifyContent: 'space-around',
   },
-  timeLabel: {
-    fontSize: 16,
+  statItem: {
+    alignItems: 'center',
+  },
+  statLabel: {
+    fontSize: 12,
     color: COLORS.textLight,
+    marginBottom: 4,
+    fontWeight: '600',
   },
-  timeValue: {
+  statValue: {
     fontSize: 18,
     fontWeight: 'bold',
     color: COLORS.text,
   },
-  rateValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.success,
+  statHint: {
+    marginTop: 4,
+    fontSize: 11,
+    color: COLORS.textLight,
   },
-  divider: {
-    height: 1,
-    backgroundColor: COLORS.textLight,
-    marginVertical: 10,
-    opacity: 0.3,
-  },
-  upgradeButton: {
-    backgroundColor: COLORS.secondary,
+  cancelButton: {
+    backgroundColor: COLORS.darkCard,
+    borderRadius: 16,
     paddingVertical: 16,
-    borderRadius: 12,
+    paddingHorizontal: 24,
+    borderWidth: 4,
+    borderColor: COLORS.slate,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 15,
+    justifyContent: 'center',
   },
-  upgradeButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
+  cancelButtonIcon: {
+    fontSize: 20,
+    color: COLORS.textLight,
+    marginRight: 8,
   },
-  backButton: {
-    backgroundColor: COLORS.textLight,
-    paddingVertical: 15,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  backButtonText: {
-    color: '#FFFFFF',
+  cancelButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
+    color: COLORS.textLight,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -450,6 +581,8 @@ const styles = StyleSheet.create({
     padding: 20,
     width: '90%',
     maxHeight: '85%',
+    borderWidth: 4,
+    borderColor: COLORS.orange,
   },
   modalTitle: {
     fontSize: 24,
@@ -465,16 +598,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   currentMultiplierInfo: {
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.darkCard,
     padding: 15,
     borderRadius: 10,
     marginBottom: 20,
     alignItems: 'center',
-  },
-  infoLabel: {
-    fontSize: 16,
-    color: COLORS.textLight,
-    marginBottom: 5,
   },
   infoValue: {
     fontSize: 20,
@@ -485,7 +613,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   multiplierOption: {
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.darkCard,
     padding: 15,
     borderRadius: 10,
     marginBottom: 10,
@@ -526,12 +654,12 @@ const styles = StyleSheet.create({
   maxMultiplierText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#FFFFFF',
+    color: COLORS.text,
     marginBottom: 5,
   },
   maxMultiplierSubtext: {
     fontSize: 14,
-    color: '#FFFFFF',
+    color: COLORS.text,
     opacity: 0.9,
   },
   adBadge: {
@@ -541,12 +669,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   adBadgeText: {
-    color: '#FFFFFF',
+    color: COLORS.text,
     fontSize: 11,
     fontWeight: 'bold',
   },
   modalCloseButton: {
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.darkCard,
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
@@ -578,6 +706,27 @@ const styles = StyleSheet.create({
     color: COLORS.textLight,
     fontSize: 14,
     marginTop: 5,
+  },
+  homeButton: {
+    backgroundColor: COLORS.cyan,
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderWidth: 4,
+    borderColor: COLORS.cyanLight,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+  },
+  homeButtonIcon: {
+    fontSize: 18,
+    marginRight: 8,
+  },
+  homeButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.darkCard,
   },
 });
 
