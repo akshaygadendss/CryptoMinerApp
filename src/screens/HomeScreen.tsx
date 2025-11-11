@@ -11,9 +11,9 @@ import {
   ScrollView,
   Animated,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { COLORS, DURATION_OPTIONS, MINING_RATES } from '../constants/mining';
-import api, { User, UserSummary } from '../services/api';
-import { AnimatedBackground } from '../components/AnimatedBackground';
+import api, { User, UserSummary, isMiningComplete } from '../services/api';
 
 interface HomeScreenProps {
   navigation: any;
@@ -200,19 +200,22 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <AnimatedBackground />
+      <LinearGradient
+        colors={[COLORS.background, COLORS.navyLight, COLORS.darkCard]}
+        style={styles.container}
+      >
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
-      </View>
+      </LinearGradient>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <AnimatedBackground />
-      
+    <LinearGradient
+      colors={[COLORS.background, COLORS.navyLight, COLORS.darkCard]}
+      style={styles.container}
+    >
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Top Bar - Wallet Info */}
         <View style={styles.topBar}>
@@ -279,7 +282,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             },
           ]}
         >
-          <View style={styles.balanceCardInner}>
+          <LinearGradient
+            colors={[COLORS.gradientStart, COLORS.gradientMiddle, COLORS.gradientEnd]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.balanceCardInner}
+          >
             <View style={styles.coinIconContainer}>
               <Animated.View
                 style={[
@@ -304,7 +312,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               {totalBalance.toFixed(4)}
             </Text>
             <Text style={styles.balanceUnit}>TOKENS</Text>
-          </View>
+          </LinearGradient>
         </Animated.View>
 
         {/* Mining Control Center */}
@@ -416,7 +424,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         animationType="slide"
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <LinearGradient
+            colors={[COLORS.darkCard, COLORS.cardBg]}
+            style={styles.modalContent}
+          >
             <Text style={styles.modalTitle}>Select Mining Duration</Text>
             <Text style={styles.modalSubtitle}>Mining will start at 1× multiplier</Text>
             <Text style={styles.modalInfo}>
@@ -455,10 +466,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 <Text style={styles.confirmButtonText}>Next: Select Multiplier</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </LinearGradient>
         </View>
       </Modal>
-    </View>
+    </LinearGradient>
   );
 };
 
@@ -593,11 +604,10 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   balanceCardInner: {
-    backgroundColor: COLORS.orange,
     borderRadius: 24,
     padding: 32,
-    borderWidth: 4,
-    borderColor: COLORS.orangeLight,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },

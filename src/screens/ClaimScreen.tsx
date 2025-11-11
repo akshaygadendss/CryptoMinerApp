@@ -7,9 +7,9 @@ import {
   Alert,
   Animated,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { COLORS } from '../constants/mining';
 import api, { User } from '../services/api';
-import { AnimatedBackground } from '../components/AnimatedBackground';
 
 interface ClaimScreenProps {
   navigation: any;
@@ -130,12 +130,14 @@ const ClaimScreen: React.FC<ClaimScreenProps> = ({ navigation }) => {
 
   if (loading || !user) {
     return (
-      <View style={styles.container}>
-        <AnimatedBackground />
+      <LinearGradient
+        colors={[COLORS.background, COLORS.navyLight, COLORS.darkCard]}
+        style={styles.container}
+      >
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
-      </View>
+      </LinearGradient>
     );
   }
 
@@ -145,9 +147,10 @@ const ClaimScreen: React.FC<ClaimScreenProps> = ({ navigation }) => {
   });
 
   return (
-    <View style={styles.container}>
-      <AnimatedBackground />
-      
+    <LinearGradient
+      colors={[COLORS.background, COLORS.navyLight, COLORS.darkCard]}
+      style={styles.container}
+    >
       <View style={styles.content}>
         {/* Trophy Icon */}
         <Animated.View
@@ -204,7 +207,7 @@ const ClaimScreen: React.FC<ClaimScreenProps> = ({ navigation }) => {
           </Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </LinearGradient>
   );
 };
 

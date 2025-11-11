@@ -2,6 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = 'http://192.168.1.39:3000/api';
+//const API_URL = 'http://10.97.121.196:3000/api';
 
 export interface User {
   _id: string;
@@ -30,6 +31,15 @@ export interface UserSummary {
   totalEarnedSum: number;
   latestSession: User | null;
 }
+
+export const isMiningComplete = (user: User | null): boolean => {
+  if (!user || user.status !== 'mining') return false;
+  const startTime = new Date(user.miningStartTime || '');
+  const now = new Date();
+  const totalElapsedSeconds = Math.floor((now.getTime() - startTime.getTime()) / 1000);
+  const totalSeconds = user.selectedHour * 3600;
+  return totalElapsedSeconds >= totalSeconds;
+};
 
 class API {
   async signup(wallet: string): Promise<User> {

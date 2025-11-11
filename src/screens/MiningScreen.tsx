@@ -9,9 +9,9 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { COLORS, MINING_RATES } from '../constants/mining';
 import api, { MiningProgress } from '../services/api';
-import { AnimatedBackground } from '../components/AnimatedBackground';
 
 interface MiningScreenProps {
   navigation: any;
@@ -195,9 +195,10 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
   });
 
   return (
-    <View style={styles.container}>
-      <AnimatedBackground />
-      
+    <LinearGradient
+      colors={[COLORS.background, COLORS.navyLight, COLORS.darkCard]}
+      style={styles.container}
+    >
       <View style={styles.content}>
         <Text style={styles.title}>MINING IN PROGRESS</Text>
 
@@ -378,7 +379,7 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
           </View>
         </View>
       </Modal>
-    </View>
+    </LinearGradient>
   );
 };
 

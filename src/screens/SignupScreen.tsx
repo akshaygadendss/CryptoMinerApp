@@ -11,9 +11,9 @@ import {
   Alert,
   Animated,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { COLORS } from '../constants/mining';
 import api from '../services/api';
-import { AnimatedBackground } from "../components/AnimatedBackground";
 
 interface SignupScreenProps {
   navigation: any;
@@ -86,9 +86,10 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
-      <AnimatedBackground />
-      
+    <LinearGradient
+      colors={[COLORS.background, COLORS.navyLight, COLORS.darkCard]}
+      style={styles.container}
+    >
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -152,7 +153,7 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
           </View>
         </View>
       </KeyboardAvoidingView>
-    </View>
+    </LinearGradient>
   );
 };
 
