@@ -7,12 +7,12 @@ import {
   Animated,
   Modal,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { COLORS, MINING_RATES } from '../constants/mining';
 import api, { MiningProgress } from '../services/api';
 import { useConfig } from '../hooks/useConfig';
+import { showSuccessToast, showErrorToast, showInfoToast } from '../utils/toast';
 
 interface MiningScreenProps {
   navigation: any;
@@ -133,7 +133,7 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
 
     try {
       if (!wallet) {
-        Alert.alert('Error', 'Wallet not found');
+        showErrorToast('Wallet not found');
         return;
       }
 
@@ -142,7 +142,7 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
 
       // Validate max multiplier
       if (nextMultiplier > 6) {
-        Alert.alert('Maximum Reached', 'You have reached the maximum multiplier of 6×');
+        showInfoToast('You have reached the maximum multiplier of 6×', 'Maximum Reached');
         return;
       }
 
@@ -161,9 +161,9 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
       
       // Show success message
       if (miningRates) {
-        Alert.alert(
-          'Success!', 
-          `Multiplier upgraded to ${nextMultiplier}×\nYou now earn ${miningRates[nextMultiplier].hourlyReward.toFixed(2)} tokens/hour`
+        showSuccessToast(
+          `You now earn ${miningRates[nextMultiplier].hourlyReward.toFixed(2)} tokens/hour! 🚀`,
+          `Upgraded to ${nextMultiplier}× Multiplier`
         );
       }
       
@@ -173,7 +173,7 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
     } catch (error: any) {
       console.error('[MiningScreen] Failed to upgrade multiplier:', error);
       const errorMessage = error.response?.data?.message || 'Failed to upgrade multiplier. Please try again.';
-      Alert.alert('Error', errorMessage);
+      showErrorToast(errorMessage, 'Upgrade Failed');
     } finally {
       setLoadingAd(false);
     }

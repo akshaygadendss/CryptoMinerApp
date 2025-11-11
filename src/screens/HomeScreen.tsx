@@ -1,20 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
   TouchableOpacity,
-  StyleSheet,
-  Alert,
   Modal,
   ScrollView,
   Animated,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { COLORS, DURATION_OPTIONS, MINING_RATES } from '../constants/mining';
-import api, { User, UserSummary, isMiningComplete } from '../services/api';
+import LottieView from 'lottie-react-native';
+import { COLORS } from '../constants/mining';
+import api, { User, UserSummary } from '../services/api';
 import { useConfig } from '../hooks/useConfig';
+import { styles } from './HomeScreen.styles';
+import { showSuccessToast, showErrorToast, showInfoToast } from '../utils/toast';
 
 interface HomeScreenProps {
   navigation: any;
@@ -30,10 +31,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [balanceAnim] = useState(new Animated.Value(1));
   const [userIconAnim] = useState(new Animated.Value(0));
   const [statusAnim] = useState(new Animated.Value(1));
+  const walletAnimRef = useRef<LottieView>(null);
 
   useEffect(() => {
     loadUserData();
-    
+
     // Animate user icon
     Animated.loop(
       Animated.sequence([
@@ -135,7 +137,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         status: error.response?.status
       });
       const errorMessage = error.response?.data?.error || error.message || 'Failed to load user data';
-      Alert.alert('Error', errorMessage);
+      showErrorToast(errorMessage, 'Error Loading Data');
     } finally {
       setLoading(false);
     }
@@ -145,14 +147,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     if (user?.status === 'mining') {
       navigation.navigate('Mining');
     } else if (user?.status === 'ready_to_claim') {
-      Alert.alert(
-        'Unclaimed Rewards',
-        'You have unclaimed rewards from your previous mining session. Please claim them before starting a new session.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Claim Now', onPress: () => navigation.navigate('Claim') }
-        ]
-      );
+      showInfoToast('Please claim your previous rewards first', 'Unclaimed Rewards');
+      navigation.navigate('Claim');
     } else {
       setShowDurationModal(true);
     }
@@ -171,6 +167,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       });
       await api.startMining(user.wallet, selectedHour, 1);
       console.log('[HomeScreen] Mining started successfully, navigating to Mining screen');
+      showSuccessToast(`Mining started for ${selectedHour} hour(s)! ⛏️`, 'Mining Started');
       navigation.navigate('Mining');
     } catch (error: any) {
       console.error('[HomeScreen] Failed to start mining:', {
@@ -179,7 +176,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         status: error.response?.status
       });
       const errorMessage = error.response?.data?.error || error.message || 'Failed to start mining';
-      Alert.alert('Error', errorMessage);
+      showErrorToast(errorMessage, 'Mining Failed');
     } finally {
       setLoading(false);
     }
@@ -198,6 +195,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     if (user.status === 'mining') return COLORS.green;
     if (user.status === 'ready_to_claim') return COLORS.yellow;
     return COLORS.slate;
+  };
+
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem('wallet');
+      showInfoToast('You have been logged out', 'Goodbye! 👋');
+    } catch { }
+    navigation.replace('Signup');
   };
 
   if (loading || configLoading || !miningRates || !durationOptions) {
@@ -261,12 +266,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
           <TouchableOpacity
             style={styles.awardButton}
-            onPress={async () => {
-              try {
-                await AsyncStorage.removeItem('wallet');
-              } catch {}
-              navigation.replace('Signup');
-            }}
+            onPress={handleLogout}
           >
             <Text style={styles.awardIcon}>🚪</Text>
           </TouchableOpacity>
@@ -290,25 +290,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             end={{ x: 1, y: 1 }}
             style={styles.balanceCardInner}
           >
-            <View style={styles.coinIconContainer}>
-              <Animated.View
-                style={[
-                  styles.coinIcon,
-                  {
-                    transform: [
-                      {
-                        rotate: balanceAnim.interpolate({
-                          inputRange: [1, 1.3],
-                          outputRange: ['0deg', '360deg'],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
-              >
-                <Text style={styles.coinIconText}>🪙</Text>
-              </Animated.View>
+            <View style={styles.walletAnimContainer}>
+              <LottieView
+                ref={walletAnimRef}
+                source={require('../../assets/Animations/Wallet.json')}
+                autoPlay
+                loop
+                style={styles.walletAnim}
+              />
             </View>
+
             <Text style={styles.balanceLabel}>TOTAL BALANCE</Text>
             <Text style={styles.balanceAmount}>
               {totalBalance.toFixed(4)}
@@ -435,7 +426,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <Text style={styles.modalInfo}>
               You can upgrade multiplier during mining by watching ads
             </Text>
-            
+
             <ScrollView style={styles.optionsList}>
               {durationOptions.map((option) => (
                 <TouchableOpacity
@@ -474,467 +465,5 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     </LinearGradient>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  loadingText: {
-    fontSize: 18,
-    color: COLORS.text,
-  },
-  content: {
-    flex: 1,
-    padding: 16,
-    zIndex: 10,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 32,
-  },
-  topBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  leftRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexShrink: 1,
-  },
-  walletInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderWidth: 2,
-    borderColor: COLORS.cyan,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-    maxWidth: '65%',
-    marginRight: 8,
-  },
-  statusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 12,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderWidth: 2,
-    borderColor: COLORS.cyan,
-    marginLeft: 0,
-  },
-  statusDotSmall: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  statusTextSmall: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  userIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.cyan,
-    borderWidth: 2,
-    borderColor: COLORS.cyanLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  userIconText: {
-    fontSize: 18,
-  },
-  walletTextContainer: {
-    flex: 1,
-  },
-  walletLabel: {
-    fontSize: 10,
-    color: COLORS.textLight,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  walletId: {
-    fontSize: 12,
-    color: COLORS.text,
-    fontWeight: 'bold',
-    maxWidth: '100%',
-  },
-  awardButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: COLORS.orange,
-    borderWidth: 4,
-    borderColor: COLORS.orangeLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  awardIcon: {
-    fontSize: 24,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.cyan,
-    textAlign: 'center',
-    marginBottom: 32,
-  },
-  balanceCard: {
-    marginBottom: 24,
-  },
-  balanceCardInner: {
-    borderRadius: 24,
-    padding: 32,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
-    overflow: 'hidden',
-  },
-  coinIconContainer: {
-    marginBottom: 16,
-  },
-  coinIcon: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderWidth: 4,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  coinIconText: {
-    fontSize: 48,
-  },
-  balanceLabel: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 8,
-    fontWeight: '600',
-  },
-  balanceAmount: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: COLORS.text,
-    marginBottom: 4,
-  },
-  balanceUnit: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    marginBottom: 24,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 4,
-    borderColor: COLORS.cyan,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-    marginRight: 8,
-  },
-  earningsCard: {
-    borderColor: COLORS.orange,
-    marginRight: 0,
-    marginLeft: 8,
-  },
-  statHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  statIcon: {
-    fontSize: 20,
-    marginRight: 8,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: COLORS.textLight,
-    fontWeight: '600',
-  },
-  statusIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 8,
-  },
-  statusText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  earningsAmount: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.text,
-    marginBottom: 4,
-  },
-  earningsSubtext: {
-    fontSize: 12,
-    color: COLORS.slate,
-  },
-  controlCard: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 24,
-    padding: 24,
-    borderWidth: 4,
-    borderColor: COLORS.cyan,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  controlHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-  },
-  controlIcon: {
-    fontSize: 24,
-    marginRight: 8,
-  },
-  controlTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.cyan,
-  },
-  controlSubtext: {
-    fontSize: 14,
-    color: COLORS.textLight,
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  startButton: {
-    backgroundColor: COLORS.cyan,
-    borderRadius: 16,
-    paddingVertical: 20,
-    paddingHorizontal: 24,
-    borderWidth: 4,
-    borderColor: COLORS.cyanLight,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  startButtonIcon: {
-    fontSize: 24,
-    marginRight: 8,
-  },
-  startButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.darkCard,
-  },
-  miningStatusContainer: {
-    alignItems: 'center',
-  },
-  miningIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.green,
-    borderWidth: 4,
-    borderColor: COLORS.greenLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  miningIconText: {
-    fontSize: 40,
-  },
-  miningStatusText: {
-    fontSize: 16,
-    color: COLORS.green,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  miningStatusSubtext: {
-    fontSize: 12,
-    color: COLORS.textLight,
-  },
-  trophyIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.yellow,
-    borderWidth: 4,
-    borderColor: COLORS.yellowLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-    alignSelf: 'center',
-  },
-  trophyIconText: {
-    fontSize: 40,
-  },
-  claimText: {
-    fontSize: 16,
-    color: COLORS.yellow,
-    textAlign: 'center',
-    marginBottom: 24,
-    fontWeight: '600',
-  },
-  claimButton: {
-    backgroundColor: COLORS.orange,
-    borderRadius: 16,
-    paddingVertical: 20,
-    paddingHorizontal: 24,
-    borderWidth: 4,
-    borderColor: COLORS.orangeLight,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  claimButtonIcon: {
-    fontSize: 24,
-    marginRight: 8,
-  },
-  claimButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.text,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 20,
-    padding: 20,
-    width: '90%',
-    maxHeight: '80%',
-    borderWidth: 4,
-    borderColor: COLORS.cyan,
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: COLORS.cyan,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: COLORS.textLight,
-    marginBottom: 5,
-    textAlign: 'center',
-  },
-  modalInfo: {
-    fontSize: 12,
-    color: COLORS.secondary,
-    marginBottom: 20,
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  optionsList: {
-    maxHeight: 300,
-  },
-  optionItem: {
-    backgroundColor: COLORS.darkCard,
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: COLORS.slate,
-  },
-  optionItemSelected: {
-    backgroundColor: COLORS.cyan,
-    borderColor: COLORS.cyanLight,
-  },
-  optionText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  optionReward: {
-    fontSize: 14,
-    color: COLORS.textLight,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 20,
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginHorizontal: 5,
-  },
-  cancelButton: {
-    backgroundColor: COLORS.darkCard,
-  },
-  confirmButton: {
-    backgroundColor: COLORS.success,
-  },
-  cancelButtonText: {
-    color: COLORS.text,
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  confirmButtonText: {
-    color: COLORS.text,
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-});
 
 export default HomeScreen;

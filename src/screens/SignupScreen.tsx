@@ -8,12 +8,12 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   Animated,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { COLORS } from '../constants/mining';
 import api from '../services/api';
+import { showSuccessToast, showErrorToast } from '../utils/toast';
 
 interface SignupScreenProps {
   navigation: any;
@@ -62,7 +62,7 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
 
   const handleSignup = async () => {
     if (!wallet.trim()) {
-      Alert.alert('Error', 'Please enter your wallet address');
+      showErrorToast('Please enter your wallet address');
       return;
     }
 
@@ -71,6 +71,7 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
       console.log('[SignupScreen] Starting signup for wallet:', wallet.trim());
       await api.signup(wallet.trim());
       console.log('[SignupScreen] Signup successful, navigating to Home');
+      showSuccessToast('Welcome to Crypto Mining Village! 🎉', 'Account Created');
       navigation.replace('Home');
     } catch (error: any) {
       console.error('[SignupScreen] Signup failed:', {
@@ -79,7 +80,7 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
         status: error.response?.status
       });
       const errorMessage = error.response?.data?.error || error.message || 'Failed to signup';
-      Alert.alert('Error', errorMessage);
+      showErrorToast(errorMessage, 'Signup Failed');
     } finally {
       setLoading(false);
     }

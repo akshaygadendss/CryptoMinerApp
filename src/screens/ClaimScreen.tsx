@@ -4,12 +4,12 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   Animated,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { COLORS } from '../constants/mining';
 import api, { User } from '../services/api';
+import { showSuccessToast, showErrorToast } from '../utils/toast';
 
 interface ClaimScreenProps {
   navigation: any;
@@ -84,7 +84,7 @@ const ClaimScreen: React.FC<ClaimScreenProps> = ({ navigation }) => {
         status: error.response?.status
       });
       const errorMessage = error.response?.data?.error || error.message || 'Failed to load user data';
-      Alert.alert('Error', errorMessage);
+      showErrorToast(errorMessage, 'Error Loading Data');
     } finally {
       setLoading(false);
     }
@@ -96,7 +96,7 @@ const ClaimScreen: React.FC<ClaimScreenProps> = ({ navigation }) => {
     setLoading(true);
     try {
       console.log('[ClaimScreen] Claiming rewards for wallet:', user.wallet);
-      await api.claimReward(user.wallet);
+      const result = await api.claimReward(user.wallet);
       console.log('[ClaimScreen] Rewards claimed successfully');
       
       // Animate reward
@@ -113,8 +113,10 @@ const ClaimScreen: React.FC<ClaimScreenProps> = ({ navigation }) => {
         }),
       ]).start();
       
+      showSuccessToast(`${user.currentMiningPoints.toFixed(4)} tokens claimed! 🎉`, 'Rewards Claimed');
+      
       // Redirect to Home to show Start Mining option
-      navigation.replace('Home');
+      setTimeout(() => navigation.replace('Home'), 1000);
     } catch (error: any) {
       console.error('[ClaimScreen] Failed to claim rewards:', {
         message: error.message,
@@ -122,7 +124,7 @@ const ClaimScreen: React.FC<ClaimScreenProps> = ({ navigation }) => {
         status: error.response?.status
       });
       const errorMessage = error.response?.data?.error || error.message || 'Failed to claim rewards';
-      Alert.alert('Error', errorMessage);
+      showErrorToast(errorMessage, 'Claim Failed');
     } finally {
       setLoading(false);
     }
