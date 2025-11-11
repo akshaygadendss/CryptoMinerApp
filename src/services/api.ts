@@ -189,6 +189,24 @@ class API {
       throw error;
     }
   }
+
+  async getConfig(key?: string): Promise<any> {
+    try {
+      const url = key ? `${API_URL}/config/${key}` : `${API_URL}/config`;
+      console.log('[API] GetConfig request:', { key, url });
+      const response = await axios.get(url);
+      console.log('[API] GetConfig response:', response.data);
+      return key ? response.data.value : response.data.configs;
+    } catch (error: any) {
+      console.error('[API] GetConfig error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        url: error.config?.url
+      });
+      throw error;
+    }
+  }
 }
 
 export default new API();

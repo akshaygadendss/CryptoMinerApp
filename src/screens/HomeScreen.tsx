@@ -14,12 +14,14 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import { COLORS, DURATION_OPTIONS, MINING_RATES } from '../constants/mining';
 import api, { User, UserSummary, isMiningComplete } from '../services/api';
+import { useConfig } from '../hooks/useConfig';
 
 interface HomeScreenProps {
   navigation: any;
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
+  const { miningRates, durationOptions, loading: configLoading } = useConfig();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [totalBalance, setTotalBalance] = useState<number>(0);
@@ -198,7 +200,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     return COLORS.slate;
   };
 
-  if (loading) {
+  if (loading || configLoading || !miningRates || !durationOptions) {
     return (
       <LinearGradient
         colors={[COLORS.background, COLORS.navyLight, COLORS.darkCard]}
@@ -435,7 +437,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             </Text>
             
             <ScrollView style={styles.optionsList}>
-              {DURATION_OPTIONS.map((option) => (
+              {durationOptions.map((option) => (
                 <TouchableOpacity
                   key={option.value}
                   style={[
@@ -446,7 +448,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 >
                   <Text style={styles.optionText}>{option.label}</Text>
                   <Text style={styles.optionReward}>
-                    {(MINING_RATES[1].hourlyReward * option.value).toFixed(2)} tokens
+                    {(miningRates[1].hourlyReward * option.value).toFixed(2)} tokens
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -463,7 +465,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 style={[styles.modalButton, styles.confirmButton]}
                 onPress={handleDurationConfirm}
               >
-                <Text style={styles.confirmButtonText}>Next: Select Multiplier</Text>
+                <Text style={styles.confirmButtonText}>Start Session</Text>
               </TouchableOpacity>
             </View>
           </LinearGradient>

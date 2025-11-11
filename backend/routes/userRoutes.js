@@ -1,6 +1,7 @@
 import express from 'express';
 import User from '../models/User.js';
 import MinerUser from '../models/MinerUser.js';
+import Config from '../models/Config.js';
 
 const router = express.Router();
 
@@ -430,6 +431,47 @@ router.get('/miner-users/date-range', async (req, res) => {
     });
   } catch (error) {
     console.error('[GET-MINER-USERS-DATE-RANGE] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get config by key
+router.get('/config/:key', async (req, res) => {
+  try {
+    const { key } = req.params;
+    console.log('[GET-CONFIG] Fetching config:', key);
+
+    const config = await Config.findOne({ key: key.toUpperCase() });
+
+    if (!config) {
+      return res.status(404).json({ error: 'Config not found' });
+    }
+
+    res.status(200).json({ 
+      key: config.key,
+      value: config.value,
+      updatedAt: config.updatedAt
+    });
+  } catch (error) {
+    console.error('[GET-CONFIG] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all configs
+router.get('/config', async (req, res) => {
+  try {
+    console.log('[GET-ALL-CONFIGS] Fetching all configs...');
+    const configs = await Config.find();
+
+    const configMap = {};
+    configs.forEach(config => {
+      configMap[config.key] = config.value;
+    });
+
+    res.status(200).json({ configs: configMap });
+  } catch (error) {
+    console.error('[GET-ALL-CONFIGS] Error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });

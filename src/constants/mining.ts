@@ -1,4 +1,7 @@
-export const MINING_RATES: Record<number, { rate: number; hourlyReward: number }> = {
+import api from '../services/api';
+
+// Fallback values (used if API fails)
+const FALLBACK_MINING_RATES: Record<number, { rate: number; hourlyReward: number }> = {
   1: { rate: 0.0100, hourlyReward: 36.00 },
   2: { rate: 0.0200, hourlyReward: 72.00 },
   3: { rate: 0.0300, hourlyReward: 108.00 },
@@ -6,14 +9,54 @@ export const MINING_RATES: Record<number, { rate: number; hourlyReward: number }
   5: { rate: 0.0500, hourlyReward: 180.00 },
   6: { rate: 0.0600, hourlyReward: 216.00 },
 };
- 
-export const DURATION_OPTIONS = [
+
+const FALLBACK_DURATION_OPTIONS = [
   { value: 1, label: '1 Hour' },
   { value: 2, label: '2 Hours' },
   { value: 4, label: '4 Hours' },
   { value: 12, label: '12 Hours' },
   { value: 24, label: '24 Hours' },
 ];
+
+// Cache for config values
+let cachedMiningRates: Record<number, { rate: number; hourlyReward: number }> | null = null;
+let cachedDurationOptions: Array<{ value: number; label: string }> | null = null;
+
+// Fetch MINING_RATES from API
+export const getMiningRates = async (): Promise<Record<number, { rate: number; hourlyReward: number }>> => {
+  if (cachedMiningRates) {
+    return cachedMiningRates;
+  }
+
+  try {
+    const rates = await api.getConfig('MINING_RATES');
+    cachedMiningRates = rates;
+    return rates;
+  } catch (error) {
+    console.warn('[MINING_RATES] Failed to fetch from API, using fallback:', error);
+    return FALLBACK_MINING_RATES;
+  }
+};
+
+// Fetch DURATION_OPTIONS from API
+export const getDurationOptions = async (): Promise<Array<{ value: number; label: string }>> => {
+  if (cachedDurationOptions) {
+    return cachedDurationOptions;
+  }
+
+  try {
+    const options = await api.getConfig('DURATION_OPTIONS');
+    cachedDurationOptions = options;
+    return options;
+  } catch (error) {
+    console.warn('[DURATION_OPTIONS] Failed to fetch from API, using fallback:', error);
+    return FALLBACK_DURATION_OPTIONS;
+  }
+};
+
+// Export fallbacks for immediate use (backward compatibility)
+export const MINING_RATES = FALLBACK_MINING_RATES;
+export const DURATION_OPTIONS = FALLBACK_DURATION_OPTIONS;
  
 export const COLORS = {
   // 🎨 Primary Theme Colors (Dark Modern Gradient Palette)

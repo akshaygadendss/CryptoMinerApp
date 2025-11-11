@@ -12,12 +12,14 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import { COLORS, MINING_RATES } from '../constants/mining';
 import api, { MiningProgress } from '../services/api';
+import { useConfig } from '../hooks/useConfig';
 
 interface MiningScreenProps {
   navigation: any;
 }
 
 const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
+  const { miningRates, loading: configLoading } = useConfig();
   const [progress, setProgress] = useState<MiningProgress>({
     currentPoints: 0,
     timeElapsed: 0,
@@ -158,10 +160,12 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
       setCurrentMultiplier(nextMultiplier);
       
       // Show success message
-      Alert.alert(
-        'Success!', 
-        `Multiplier upgraded to ${nextMultiplier}×\nYou now earn ${MINING_RATES[nextMultiplier].hourlyReward.toFixed(2)} tokens/hour`
-      );
+      if (miningRates) {
+        Alert.alert(
+          'Success!', 
+          `Multiplier upgraded to ${nextMultiplier}×\nYou now earn ${miningRates[nextMultiplier].hourlyReward.toFixed(2)} tokens/hour`
+        );
+      }
       
       // Reload progress to reflect new multiplier
       await loadWalletAndProgress();
@@ -193,6 +197,19 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
     inputRange: [0, 0.5, 1],
     outputRange: [0, -5, 0],
   });
+
+  if (configLoading || !miningRates) {
+    return (
+      <LinearGradient
+        colors={[COLORS.background, COLORS.navyLight, COLORS.darkCard]}
+        style={styles.container}
+      >
+        <View style={styles.content}>
+          <Text style={styles.title}>Loading...</Text>
+        </View>
+      </LinearGradient>
+    );
+  }
 
   return (
     <LinearGradient
@@ -287,7 +304,7 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
             <View style={styles.statItem}>
               <Text style={styles.statLabel}>RATE</Text>
               <Text style={styles.statValue}>
-                {MINING_RATES[currentMultiplier].rate.toFixed(4)}/sec
+                {miningRates[currentMultiplier].rate.toFixed(4)}/sec
               </Text>
             </View>
           </View>
@@ -318,7 +335,7 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
             <View style={styles.currentMultiplierInfo}>
               <Text style={styles.infoLabel}>Current: {currentMultiplier}×</Text>
               <Text style={styles.infoValue}>
-                {MINING_RATES[currentMultiplier].hourlyReward.toFixed(2)} tokens/hour
+                {miningRates[currentMultiplier].hourlyReward.toFixed(2)} tokens/hour
               </Text>
             </View>
 
@@ -337,10 +354,10 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
                     </View>
                   </View>
                   <Text style={styles.multiplierOptionRate}>
-                    {MINING_RATES[currentMultiplier + 1].hourlyReward.toFixed(2)} tokens/hour
+                    {miningRates[currentMultiplier + 1].hourlyReward.toFixed(2)} tokens/hour
                   </Text>
                   <Text style={styles.multiplierBoost}>
-                    +{((MINING_RATES[currentMultiplier + 1].hourlyReward - MINING_RATES[currentMultiplier].hourlyReward) / MINING_RATES[currentMultiplier].hourlyReward * 100).toFixed(0)}% increase
+                    +{((miningRates[currentMultiplier + 1].hourlyReward - miningRates[currentMultiplier].hourlyReward) / miningRates[currentMultiplier].hourlyReward * 100).toFixed(0)}% increase
                   </Text>
                   <Text style={styles.upgradeNote}>
                     Sequential upgrade: {currentMultiplier}× → {currentMultiplier + 1}×
