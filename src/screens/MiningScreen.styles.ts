@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
     width: '90%',
     maxHeight: '85%',
     borderWidth: 4,
-    borderColor: COLORS.orange,
+    borderColor: 'rgba(44, 255, 233, 1)',
   },
   modalTitle: {
     fontSize: 24,

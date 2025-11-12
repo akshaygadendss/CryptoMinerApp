@@ -111,9 +111,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const handleStartMining = () => {
     if (user?.status === 'mining') {
       navigation.navigate('Mining');
-    } else if (user?.status === 'ready_to_claim') {
-      showInfoToast('Please claim your previous rewards first', 'Unclaimed Rewards');
-      navigation.navigate('Claim');
     } else {
       setShowDurationModal(true);
     }
@@ -167,7 +164,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           />
         </View>
         <View style={localStyles.avatarTextContainer}>
-          <Text style={localStyles.avatarTitle}>MINER</Text>
+          <Text style={localStyles.avatarTitle} numberOfLines={1}>
+            {user?.wallet ? (user.wallet.length > 6 ? `${user.wallet.slice(0, 6)}....` : user.wallet) : 'MINER'}
+          </Text>
         </View>
       </View>
 
@@ -195,20 +194,39 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </View>
       </View>
 
-      {/* Mine Now Button (pulse animation only) */}
-      <TouchableOpacity onPress={handleStartMining} activeOpacity={0.8} style={localStyles.mineNowContainer}>
-        <Animated.Image
-          source={
-            user?.status === 'mining'
-              ? require('../../assets/images/homescreen/mining.png')
-              : require('../../assets/images/homescreen/mine_now.png')
-          }
-          style={[
-            localStyles.mineNowImage,
-            { transform: [{ scale: mineNowAnim }] },
-          ]}
-        />
-      </TouchableOpacity>
+      {/* Mine Now Button or Claim Reward Button */}
+      {user?.status === 'ready_to_claim' ? (
+        <TouchableOpacity 
+          onPress={() => navigation.navigate('Claim')} 
+          activeOpacity={0.8} 
+          style={localStyles.claimRewardButton}
+        >
+          <LinearGradient
+            colors={['#FFD700', '#FFA500']}
+            style={localStyles.claimGradient}
+          >
+            <Text style={localStyles.claimRewardText}>🎁 CLAIM REWARD</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity 
+          onPress={handleStartMining} 
+          activeOpacity={0.8} 
+          style={localStyles.mineNowContainer}
+        >
+          <Animated.Image
+            source={
+              user?.status === 'mining'
+                ? require('../../assets/images/homescreen/mining.png')
+                : require('../../assets/images/homescreen/mine_now.png')
+            }
+            style={[
+              localStyles.mineNowImage,
+              { transform: [{ scale: mineNowAnim }] },
+            ]}
+          />
+        </TouchableOpacity>
+      )}
 
       {/* Duration Modal (unchanged) */}
       <Modal visible={showDurationModal} transparent animationType="slide">
@@ -244,7 +262,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 style={[baseStyles.modalButton, baseStyles.confirmButton]}
                 onPress={handleDurationConfirm}
               >
-                <Text style={baseStyles.confirmButtonText}>Start Session</Text>
+                <Text style={baseStyles.confirmButtonText}>Start Mining</Text>
               </TouchableOpacity>
             </View>
           </LinearGradient>
@@ -373,6 +391,30 @@ const localStyles = StyleSheet.create({
     width: 280,
     height: 130,
     resizeMode: 'contain',
+  },
+  claimRewardButton: {
+    position: 'absolute',
+    bottom: 140,
+    alignSelf: 'center',
+    zIndex: 10,
+  },
+  claimGradient: {
+    paddingVertical: 18,
+    paddingHorizontal: 40,
+    borderRadius: 20,
+    borderWidth: 3,
+    borderColor: '#FFD700',
+    shadowColor: '#FFD700',
+    shadowOpacity: 0.8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  claimRewardText: {
+    color: '#000',
+    fontSize: 22,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
 });
 

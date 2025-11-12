@@ -105,4 +105,6 @@ export const COLORS = {
   gradientMiddle: '#8B5CF6', // Purple
   gradientEnd: '#EC4899',    // Pink
   gradientAccent: '#F59E0B', // Amber accent
+  buttonBackgroundColor: 'rgba(0, 163, 163, 1)',
+  buttonBorderColor:'rgba(44, 255, 233, 1)',
 };

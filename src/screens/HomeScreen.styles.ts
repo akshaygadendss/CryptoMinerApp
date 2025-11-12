@@ -419,8 +419,8 @@ export const styles = StyleSheet.create({
     borderColor: COLORS.slate,
   },
   optionItemSelected: {
-    backgroundColor: COLORS.cyan,
-    borderColor: COLORS.cyanLight,
+    backgroundColor: 'rgba(0, 163, 163, 1)',
+    borderColor: 'rgba(44, 255, 233, 1)',
   },
   optionText: {
     fontSize: 18,
@@ -447,7 +447,7 @@ export const styles = StyleSheet.create({
     backgroundColor: COLORS.darkCard,
   },
   confirmButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: 'rgba(0, 163, 163, 1)',
   },
   cancelButtonText: {
     color: COLORS.text,
