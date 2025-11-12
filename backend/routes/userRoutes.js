@@ -200,7 +200,8 @@ router.post('/calculate-progress', async (req, res) => {
     
     // Calculate total elapsed time from mining start
     const totalElapsedSeconds = Math.floor((now - startTime) / 1000);
-    const totalSeconds = user.selectedHour * 3600;
+    // FOR TESTING: Use 30 seconds instead of hours (change back to: user.selectedHour * 3600)
+    const totalSeconds = 30;
     
     // Calculate points earned with current multiplier
     const multiplierElapsedSeconds = Math.floor((now - multiplierStartTime) / 1000);

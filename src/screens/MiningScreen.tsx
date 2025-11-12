@@ -22,6 +22,7 @@ import {
   AdEventType,
   TestIds,
 } from 'react-native-google-mobile-ads';
+import notificationService from '../services/notificationService';
 
 interface MiningScreenProps {
   navigation: any;
@@ -43,6 +44,7 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
   const [rewardedAd, setRewardedAd] = useState<RewardedAd | null>(null);
   const progressAnim = useRef(new Animated.Value(0)).current;
   const tokensAnim = useRef(new Animated.Value(1)).current;
+  const notificationScheduled = useRef(false);
 
   // Load Rewarded Ad
   const loadRewardedAd = (onRewardEarned: (reward: any) => void) => {
@@ -59,7 +61,38 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
     ad.load();
   };
 
+  // Initialize notifications
+  useEffect(() => {
+    initializeNotifications();
+    return () => {
+      // Cleanup when component unmounts
+      notificationService.cancelMiningNotifications();
+    };
+  }, []);
+
+  const initializeNotifications = async () => {
+    try {
+      await notificationService.initialize();
+      const hasPermission = await notificationService.requestPermissions();
+      
+      if (!hasPermission) {
+        showInfoToast('Please enable notifications to get mining alerts');
+      }
+
+      // Setup notification handlers
+      const unsubscribe = await notificationService.setupNotificationHandlers(navigation);
+      
+      // Return cleanup function
+      return () => {
+        if (unsubscribe) unsubscribe();
+      };
+    } catch (error) {
+      console.error('[Notifications] Init error:', error);
+    }
+  };
+
   useEffect(() => loadRewardedAd(() => {}), []);
+  
   useEffect(() => {
     loadWalletAndProgress();
     const interval = setInterval(updateProgress, 1000);
@@ -78,8 +111,42 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
       Animated.timing(tokensAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
     ]).start();
 
-    if (progress.isComplete) navigation.replace('Claim');
+    // Schedule notification when mining starts or updates
+    if (progress.timeRemaining > 0 && !progress.isComplete) {
+      scheduleNotification(progress.timeRemaining, progress.currentPoints);
+    }
+
+    if (progress.isComplete) {
+      // Don't cancel notification - let it fire naturally
+      // This allows testing notifications even when app is open
+      navigation.replace('Claim');
+    }
   }, [progress]);
+
+  const scheduleNotification = async (timeRemaining: number, currentPoints: number) => {
+    try {
+      // Only schedule if we haven't scheduled yet (check if notification already exists)
+      const scheduledNotifs = await notificationService.getScheduledNotifications();
+      const existingNotif = scheduledNotifs.find(n => n.notification.id === 'mining-complete');
+      
+      // Only schedule if no notification exists yet
+      if (!existingNotif) {
+        // Calculate final tokens (approximate)
+        const rate = miningRates?.[currentMultiplier]?.rate || 0;
+        const finalTokens = currentPoints + (timeRemaining * rate);
+        
+        await notificationService.scheduleMiningCompleteNotification(
+          timeRemaining,
+          finalTokens
+        );
+        console.log('[Notifications] ✅ Scheduled for', timeRemaining, 'seconds');
+      } else {
+        console.log('[Notifications] Already scheduled, skipping');
+      }
+    } catch (error) {
+      console.error('[Notifications] Schedule error:', error);
+    }
+  };
 
   const loadWalletAndProgress = async () => {
     try {
@@ -131,6 +198,11 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
             `Upgraded to ${nextMultiplier}×`
           );
         await loadWalletAndProgress();
+        
+        // Reschedule notification with new rate
+        if (progress.timeRemaining > 0) {
+          scheduleNotification(progress.timeRemaining, progress.currentPoints);
+        }
       });
 
       rewardedAd.addAdEventListener(AdEventType.CLOSED, () => {
@@ -338,6 +410,29 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
             🏠 BACK TO HOME
           </Text>
         </TouchableOpacity>
+
+        {/* Test Notification Button - Remove this after testing */}
+        {__DEV__ && (
+          <TouchableOpacity
+            onPress={async () => {
+              await notificationService.displayImmediateNotification(
+                'Test Notification',
+                'This is a test notification'
+              );
+              showSuccessToast('Test notification sent!');
+            }}
+            style={{
+              marginTop: 15,
+              padding: 10,
+              backgroundColor: 'red',
+              borderRadius: 8,
+            }}
+          >
+            <Text style={{ color: 'white', fontWeight: 'bold' }}>
+              🔔 Test Notification
+            </Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
 
       {/* Modals (Unchanged) */}
