@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  ImageBackground,
   Image,
   KeyboardAvoidingView,
   Platform,
-  Animated,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { COLORS } from '../constants/mining';
@@ -22,9 +22,8 @@ interface SignupScreenProps {
 const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
   const [wallet, setWallet] = useState('');
   const [loading, setLoading] = useState(false);
-  const walletIconAnim = new Animated.Value(0);
 
-  React.useEffect(() => {
+  useEffect(() => {
     // If a wallet is already stored, go straight to Home
     (async () => {
       try {
@@ -36,30 +35,6 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
     })();
   }, []);
 
-  React.useEffect(() => {
-    // Animate wallet icon
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(walletIconAnim, {
-          toValue: 1,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-        Animated.delay(1000),
-      ])
-    ).start();
-  }, []);
-
-  const walletIconRotation = walletIconAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-
-  const walletIconTranslateY = walletIconAnim.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [0, -5, 0],
-  });
-
   const handleSignup = async () => {
     if (!wallet.trim()) {
       showErrorToast('Please enter your wallet address');
@@ -68,17 +43,10 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
 
     setLoading(true);
     try {
-      console.log('[SignupScreen] Starting signup for wallet:', wallet.trim());
       await api.signup(wallet.trim());
-      console.log('[SignupScreen] Signup successful, navigating to Home');
       showSuccessToast('Welcome to Crypto Mining Village! 🎉', 'Account Created');
       navigation.replace('Home');
     } catch (error: any) {
-      console.error('[SignupScreen] Signup failed:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
       const errorMessage = error.response?.data?.error || error.message || 'Failed to signup';
       showErrorToast(errorMessage, 'Signup Failed');
     } finally {
@@ -87,190 +55,136 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
   };
 
   return (
-    <LinearGradient
-      colors={[COLORS.background, COLORS.navyLight, COLORS.darkCard]}
-      style={styles.container}
+    <ImageBackground
+      source={require('../../assets/images/signupPage/bg.png')}
+      style={styles.background}
+      resizeMode="cover"
     >
       <KeyboardAvoidingView
-        style={styles.keyboardView}
+        style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.content}>
-          {/* Header Image */}
-          <View style={styles.headerImageContainer}>
+        <View style={styles.overlay}>
+          {/* Signup Card Image as container */}
+          <View style={styles.cardContainer}>
             <Image
-              source={require('../../assets/logo.png')}
-              style={styles.headerImage}
-              resizeMode="cover"
+              source={require('../../assets/images/signupPage/signup_card.png')}
+              style={styles.cardImage}
+              resizeMode="contain"
             />
-          </View>
 
-          {/* Signup Card */}
-          <View style={styles.card}>
-            {/* Wallet Icon */}
-            <Animated.View
-              style={[
-                styles.walletIconContainer,
-                {
-                  transform: [
-                    { rotate: walletIconRotation },
-                    { translateY: walletIconTranslateY },
-                  ],
-                },
-              ]}
-            >
-              <View style={styles.walletIcon}>
-                <Text style={styles.walletIconText}>💼</Text>
+            {/* Overlay Content */}
+            <View style={styles.cardContent}>
+              <Text style={styles.title}>CRYPTO MINING VILLAGE</Text>
+              <Text style={styles.subtitle}>Join the village and start mining! ⛏️</Text>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>WALLET ADDRESS</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your wallet..."
+                  placeholderTextColor={COLORS.slate}
+                  value={wallet}
+                  onChangeText={setWallet}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
               </View>
-            </Animated.View>
 
-            <Text style={styles.title}>CRYPTO MINING VILLAGE</Text>
-            <Text style={styles.subtitle}>Join the village and start mining! ⛏️</Text>
-
-            {/* Wallet Input */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>WALLET ADDRESS</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your wallet..."
-                placeholderTextColor={COLORS.slate}
-                value={wallet}
-                onChangeText={setWallet}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
+              <TouchableOpacity
+                style={[styles.button, loading && styles.buttonDisabled]}
+                onPress={handleSignup}
+                disabled={loading}
+              >
+                <Text style={styles.buttonText}>
+                  {loading ? 'Connecting...' : 'START MINING 🚀'}
+                </Text>
+              </TouchableOpacity>
             </View>
-
-            {/* Submit Button */}
-            <TouchableOpacity
-              style={[styles.button, loading && styles.buttonDisabled]}
-              onPress={handleSignup}
-              disabled={loading}
-            >
-              <Text style={styles.buttonText}>
-                {loading ? 'Connecting...' : 'START MINING 🚀'}
-              </Text>
-            </TouchableOpacity>
           </View>
         </View>
       </KeyboardAvoidingView>
-    </LinearGradient>
+    </ImageBackground>
   );
 };
 
 const styles = StyleSheet.create({
+  background: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  keyboardView: {
-    flex: 1,
-  },
-  content: {
+  overlay: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
-    zIndex: 10,
   },
-  headerImageContainer: {
-    width: '100%',
-    maxWidth: 800,
-    marginBottom: 32,
-  },
-  headerImage: {
-    width: '100%',
-    height: 200,
-    borderRadius: 24,
-    borderWidth: 4,
-    borderColor: COLORS.cyan,
-  },
-  card: {
-    width: '100%',
+  cardContainer: {
+    width: '90%',
     maxWidth: 400,
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 24,
-    padding: 32,
-    borderWidth: 4,
-    borderColor: COLORS.cyan,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  walletIconContainer: {
     alignItems: 'center',
-    marginBottom: 24,
-  },
-  walletIcon: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: COLORS.orange,
-    borderWidth: 4,
-    borderColor: COLORS.orangeLight,
     justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: COLORS.orange,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 6,
   },
-  walletIconText: {
-    fontSize: 48,
+  cardImage: {
+    width: '100%',
+    height: 400,
+    position: 'absolute',
+  },
+  cardContent: {
+    width: '80%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
     color: COLORS.cyan,
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: COLORS.textLight,
     textAlign: 'center',
-    marginBottom: 32,
+    marginBottom: 25,
   },
   inputContainer: {
     width: '100%',
     marginBottom: 24,
   },
   inputLabel: {
-    fontSize: 14,
+    fontSize: 13,
     color: COLORS.textLight,
-    marginBottom: 12,
+    marginBottom: 10,
     textAlign: 'center',
     fontWeight: '600',
   },
   input: {
-    backgroundColor: COLORS.darkCard,
-    borderRadius: 16,
-    padding: 16,
-    fontSize: 16,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 15,
     color: COLORS.text,
-    borderWidth: 4,
-    borderColor: COLORS.cyan,
+    borderWidth: 2,
+    borderColor: 'rgba(44, 255, 233, 1)',
     textAlign: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
   },
   button: {
-    backgroundColor: COLORS.orange,
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderWidth: 4,
-    borderColor: COLORS.orangeLight,
+    backgroundColor: 'rgba(0, 163, 163, 1)',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderWidth: 2,
+    borderColor: 'rgba(44, 255, 233, 1)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowRadius: 6,
     elevation: 6,
   },
   buttonDisabled: {
@@ -278,7 +192,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: COLORS.text,
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: 'bold',
     textAlign: 'center',
   },

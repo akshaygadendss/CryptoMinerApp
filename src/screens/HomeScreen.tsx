@@ -8,13 +8,17 @@ import {
   Modal,
   ScrollView,
   Animated,
+  ImageBackground,
+  Image,
+  StyleSheet,
+  Easing,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import LottieView from 'lottie-react-native';
 import { COLORS } from '../constants/mining';
 import api, { User, UserSummary } from '../services/api';
 import { useConfig } from '../hooks/useConfig';
-import { styles } from './HomeScreen.styles';
+import { styles as baseStyles } from './HomeScreen.styles';
 import { showSuccessToast, showErrorToast, showInfoToast } from '../utils/toast';
 
 interface HomeScreenProps {
@@ -29,39 +33,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [showDurationModal, setShowDurationModal] = useState(false);
   const [selectedHour, setSelectedHour] = useState(1);
   const [balanceAnim] = useState(new Animated.Value(1));
-  const [userIconAnim] = useState(new Animated.Value(0));
-  const [statusAnim] = useState(new Animated.Value(1));
+  const [mineNowAnim] = useState(new Animated.Value(1));
   const walletAnimRef = useRef<LottieView>(null);
 
   useEffect(() => {
     loadUserData();
-
-    // Animate user icon
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(userIconAnim, {
-          toValue: 1,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-        Animated.timing(userIconAnim, {
-          toValue: -1,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-        Animated.timing(userIconAnim, {
-          toValue: 0,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.delay(1200),
-      ])
-    ).start();
   }, []);
 
   useFocusEffect(
     React.useCallback(() => {
-      // Refresh user data on focus to reflect latest balance/status
       loadUserData();
       return undefined;
     }, [])
@@ -69,7 +49,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   useEffect(() => {
     if (user) {
-      // Animate balance change
       Animated.sequence([
         Animated.timing(balanceAnim, {
           toValue: 1.3,
@@ -85,57 +64,43 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   }, [user?.totalEarned]);
 
+  // 🔹 Pulse animation for mine_now / mining image
   useEffect(() => {
-    if (user?.status === 'mining' || user?.status === 'ready_to_claim') {
-      // Pulse animation for status
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(statusAnim, {
-            toValue: 0.6,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
-          Animated.timing(statusAnim, {
-            toValue: 1,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-    }
+    mineNowAnim.setValue(1);
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(mineNowAnim, {
+          toValue: user?.status === 'mining' ? 1.15 : 1.05,
+          duration: user?.status === 'mining' ? 800 : 1000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(mineNowAnim, {
+          toValue: 1,
+          duration: user?.status === 'mining' ? 800 : 1000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
   }, [user?.status]);
-
-  const userIconRotation = userIconAnim.interpolate({
-    inputRange: [-1, 0, 1],
-    outputRange: ['-10deg', '0deg', '10deg'],
-  });
 
   const loadUserData = async () => {
     try {
-      console.log('[HomeScreen] Loading user data...');
       const wallet = await api.getStoredWallet();
       if (!wallet) {
-        console.log('[HomeScreen] No wallet found, redirecting to Signup');
         navigation.replace('Signup');
         return;
       }
-      console.log('[HomeScreen] Fetching user data for wallet:', wallet);
       const userData = await api.getUser(wallet);
-      console.log('[HomeScreen] User data loaded:', userData);
       setUser(userData);
       try {
         const summary: UserSummary = await api.getUserSummary(wallet);
         setTotalBalance(summary.totalEarnedSum || 0);
-      } catch (e) {
-        console.warn('[HomeScreen] Failed to fetch summary, fallback to latest user.totalEarned');
+      } catch {
         setTotalBalance(userData?.totalEarned || 0);
       }
     } catch (error: any) {
-      console.error('[HomeScreen] Failed to load user data:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
       const errorMessage = error.response?.data?.error || error.message || 'Failed to load user data';
       showErrorToast(errorMessage, 'Error Loading Data');
     } finally {
@@ -158,43 +123,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     if (!user) return;
     setShowDurationModal(false);
     setLoading(true);
-
     try {
-      console.log('[HomeScreen] Starting mining:', {
-        wallet: user.wallet,
-        selectedHour,
-        multiplier: 1,
-      });
       await api.startMining(user.wallet, selectedHour, 1);
-      console.log('[HomeScreen] Mining started successfully, navigating to Mining screen');
       showSuccessToast(`Mining started for ${selectedHour} hour(s)! ⛏️`, 'Mining Started');
       navigation.navigate('Mining');
     } catch (error: any) {
-      console.error('[HomeScreen] Failed to start mining:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
       const errorMessage = error.response?.data?.error || error.message || 'Failed to start mining';
       showErrorToast(errorMessage, 'Mining Failed');
     } finally {
       setLoading(false);
     }
-  };
-
-  const getStatusText = () => {
-    if (!user) return 'INACTIVE';
-    if (user.status === 'mining') return 'MINING';
-    if (user.status === 'ready_to_claim') return 'READY!';
-    if (user.status === 'claimed') return 'INACTIVE';
-    return 'INACTIVE';
-  };
-
-  const getStatusColor = () => {
-    if (!user) return COLORS.slate;
-    if (user.status === 'mining') return COLORS.green;
-    if (user.status === 'ready_to_claim') return COLORS.yellow;
-    return COLORS.slate;
   };
 
   const handleLogout = async () => {
@@ -207,263 +145,235 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   if (loading || configLoading || !miningRates || !durationOptions) {
     return (
-      <LinearGradient
-        colors={[COLORS.background, COLORS.navyLight, COLORS.darkCard]}
-        style={styles.container}
-      >
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading...</Text>
+      <LinearGradient colors={[COLORS.background, COLORS.navyLight, COLORS.darkCard]} style={baseStyles.container}>
+        <View style={baseStyles.loadingContainer}>
+          <Text style={baseStyles.loadingText}>Loading...</Text>
         </View>
       </LinearGradient>
     );
   }
 
   return (
-    <LinearGradient
-      colors={[COLORS.background, COLORS.navyLight, COLORS.darkCard]}
-      style={styles.container}
+    <ImageBackground
+      source={require('../../assets/images/homescreen/bg.png')}
+      style={[baseStyles.container, { resizeMode: 'cover' }]}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Top Bar - Wallet Info */}
-        <View style={styles.topBar}>
-          <View style={styles.leftRow}>
-            <View style={styles.walletInfo}>
-              <Animated.View
-                style={[
-                  styles.userIcon,
-                  {
-                    transform: [{ rotate: userIconRotation }],
-                  },
-                ]}
-              >
-                <Text style={styles.userIconText}>👤</Text>
-              </Animated.View>
-              <View style={styles.walletTextContainer}>
-                <Text style={styles.walletLabel}>MINER</Text>
-                <Text style={styles.walletId} numberOfLines={1} ellipsizeMode="middle">
-                  {user?.wallet || 'Loading...'}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.statusPill}>
-              <View
-                style={[
-                  styles.statusDotSmall,
-                  { backgroundColor: getStatusColor() },
-                ]}
-              />
-              <Text
-                style={[
-                  styles.statusTextSmall,
-                  { color: getStatusColor() },
-                ]}
-              >
-                {getStatusText()}
-              </Text>
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={styles.awardButton}
-            onPress={handleLogout}
-          >
-            <Text style={styles.awardIcon}>🚪</Text>
-          </TouchableOpacity>
+      {/* 🔹 Avatar Card */}
+      <View style={localStyles.avatarCard}>
+        <View style={localStyles.avatarLeft}>
+          <Image
+            source={require('../../assets/images/homescreen/avatar.png')}
+            style={localStyles.avatarImage}
+          />
         </View>
+        <View style={localStyles.avatarTextContainer}>
+          <Text style={localStyles.avatarTitle}>MINER</Text>
+        </View>
+      </View>
 
-        {/* Title */}
-        <Text style={styles.title}>MINING DASHBOARD</Text>
+      {/* Logout Button */}
+      <TouchableOpacity style={localStyles.logoutButton} onPress={handleLogout}>
+        <Text style={localStyles.logoutText}>LOGOUT</Text>
+      </TouchableOpacity>
 
-        {/* Balance - Hero Section */}
-        <Animated.View
+      {/* Dashboard Title */}
+      <Text style={localStyles.dashboardTitle}>Dashboard</Text>
+
+      {/* Balance Section */}
+      <View style={localStyles.balanceContainer}>
+        <Image source={require('../../assets/images/homescreen/balance.png')} style={localStyles.balanceImage} />
+        <View style={localStyles.balanceTextContainer}>
+          <Text style={localStyles.totalBalanceLabel}>Total Balance</Text>
+          <Animated.Text
+            style={[
+              localStyles.balanceText,
+              { transform: [{ scale: balanceAnim }] },
+            ]}
+          >
+            {totalBalance.toFixed(4)} TOKENS
+          </Animated.Text>
+        </View>
+      </View>
+
+      {/* Mine Now Button (pulse animation only) */}
+      <TouchableOpacity onPress={handleStartMining} activeOpacity={0.8} style={localStyles.mineNowContainer}>
+        <Animated.Image
+          source={
+            user?.status === 'mining'
+              ? require('../../assets/images/homescreen/mining.png')
+              : require('../../assets/images/homescreen/mine_now.png')
+          }
           style={[
-            styles.balanceCard,
-            {
-              transform: [{ scale: balanceAnim }],
-            },
+            localStyles.mineNowImage,
+            { transform: [{ scale: mineNowAnim }] },
           ]}
-        >
-          <LinearGradient
-            colors={[COLORS.gradientStart, COLORS.gradientMiddle, COLORS.gradientEnd]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.balanceCardInner}
-          >
-            <View style={styles.walletAnimContainer}>
-              <LottieView
-                ref={walletAnimRef}
-                source={require('../../assets/Animations/Wallet.json')}
-                autoPlay
-                loop
-                style={styles.walletAnim}
-              />
-            </View>
+        />
+      </TouchableOpacity>
 
-            <Text style={styles.balanceLabel}>TOTAL BALANCE</Text>
-            <Text style={styles.balanceAmount}>
-              {totalBalance.toFixed(4)}
-            </Text>
-            <Text style={styles.balanceUnit}>TOKENS</Text>
-          </LinearGradient>
-        </Animated.View>
-
-        {/* Mining Control Center */}
-        <TouchableOpacity
-          activeOpacity={user?.status === 'mining' ? 0.8 : 1}
-          onPress={() => {
-            if (user?.status === 'mining') {
-              navigation.navigate('Mining');
-            }
-          }}
-          style={styles.controlCard}
-        >
-          <View style={styles.controlHeader}>
-            <Text style={styles.controlIcon}>⛏️</Text>
-            <Text style={styles.controlTitle}>MINING CONTROL</Text>
-          </View>
-
-          {(user?.status !== 'mining' && user?.status !== 'ready_to_claim') && (
-            <>
-              <Text style={styles.controlSubtext}>
-                Start a new mining session to earn tokens!
-              </Text>
-              <TouchableOpacity
-                style={styles.startButton}
-                onPress={handleStartMining}
-              >
-                <Text style={styles.startButtonIcon}>⛏️</Text>
-                <Text style={styles.startButtonText}>START MINING SESSION</Text>
-              </TouchableOpacity>
-            </>
-          )}
-
-          {user?.status === 'mining' && (
-            <View style={styles.miningStatusContainer}>
-              <Animated.View
-                style={[
-                  styles.miningIcon,
-                  {
-                    transform: [
-                      {
-                        rotate: statusAnim.interpolate({
-                          inputRange: [0.6, 1],
-                          outputRange: ['-15deg', '15deg'],
-                        }),
-                      },
-                      {
-                        translateY: statusAnim.interpolate({
-                          inputRange: [0.6, 1],
-                          outputRange: [-5, 0],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
-              >
-                <Text style={styles.miningIconText}>⛏️</Text>
-              </Animated.View>
-              <Text style={styles.miningStatusText}>Mining in progress...</Text>
-              <Text style={styles.miningStatusSubtext}>
-                Tap to view details
-              </Text>
-            </View>
-          )}
-
-          {user?.status === 'ready_to_claim' && (
-            <>
-              <Animated.View
-                style={[
-                  styles.trophyIcon,
-                  {
-                    transform: [
-                      {
-                        rotate: statusAnim.interpolate({
-                          inputRange: [0.6, 1],
-                          outputRange: ['-10deg', '10deg'],
-                        }),
-                      },
-                      {
-                        scale: statusAnim.interpolate({
-                          inputRange: [0.6, 1],
-                          outputRange: [1, 1.1],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
-              >
-                <Text style={styles.trophyIconText}>🏆</Text>
-              </Animated.View>
-              <Text style={styles.claimText}>
-                🎉 Mining Complete! Claim your rewards now!
-              </Text>
-              <TouchableOpacity
-                style={styles.claimButton}
-                onPress={() => navigation.navigate('Claim')}
-              >
-                <Text style={styles.claimButtonIcon}>🏆</Text>
-                <Text style={styles.claimButtonText}>CLAIM REWARDS</Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </TouchableOpacity>
-      </ScrollView>
-
-      {/* Duration Selection Modal */}
-      <Modal
-        visible={showDurationModal}
-        transparent={true}
-        animationType="slide"
-      >
-        <View style={styles.modalOverlay}>
-          <LinearGradient
-            colors={[COLORS.darkCard, COLORS.cardBg]}
-            style={styles.modalContent}
-          >
-            <Text style={styles.modalTitle}>Select Mining Duration</Text>
-            <Text style={styles.modalSubtitle}>Mining will start at 1× multiplier</Text>
-            <Text style={styles.modalInfo}>
-              You can upgrade multiplier during mining by watching ads
-            </Text>
-
-            <ScrollView style={styles.optionsList}>
+      {/* Duration Modal (unchanged) */}
+      <Modal visible={showDurationModal} transparent animationType="slide">
+        <View style={baseStyles.modalOverlay}>
+          <LinearGradient colors={[COLORS.darkCard, COLORS.cardBg]} style={baseStyles.modalContent}>
+            <Text style={baseStyles.modalTitle}>Select Mining Duration</Text>
+            <Text style={baseStyles.modalSubtitle}>Mining will start at 1× multiplier</Text>
+            <ScrollView style={baseStyles.optionsList}>
               {durationOptions.map((option) => (
                 <TouchableOpacity
                   key={option.value}
                   style={[
-                    styles.optionItem,
-                    selectedHour === option.value && styles.optionItemSelected
+                    baseStyles.optionItem,
+                    selectedHour === option.value && baseStyles.optionItemSelected,
                   ]}
                   onPress={() => setSelectedHour(option.value)}
                 >
-                  <Text style={styles.optionText}>{option.label}</Text>
-                  <Text style={styles.optionReward}>
+                  <Text style={baseStyles.optionText}>{option.label}</Text>
+                  <Text style={baseStyles.optionReward}>
                     {(miningRates[1].hourlyReward * option.value).toFixed(2)} tokens
                   </Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
-
-            <View style={styles.modalButtons}>
+            <View style={baseStyles.modalButtons}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
+                style={[baseStyles.modalButton, baseStyles.cancelButton]}
                 onPress={() => setShowDurationModal(false)}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={baseStyles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButton, styles.confirmButton]}
+                style={[baseStyles.modalButton, baseStyles.confirmButton]}
                 onPress={handleDurationConfirm}
               >
-                <Text style={styles.confirmButtonText}>Start Session</Text>
+                <Text style={baseStyles.confirmButtonText}>Start Session</Text>
               </TouchableOpacity>
             </View>
           </LinearGradient>
         </View>
       </Modal>
-    </LinearGradient>
+    </ImageBackground>
   );
 };
+
+const localStyles = StyleSheet.create({
+  avatarCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'absolute',
+    top: 40,
+    left: 20,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderWidth: 1,
+    borderColor: '#00FFFF',
+    borderRadius: 15,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    height: 56,
+    zIndex: 10,
+    shadowColor: '#00FFFF',
+    shadowOpacity: 0.6,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+  },
+  avatarLeft: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,255,255,0.1)',
+    borderRadius: 30,
+    padding: 5,
+    borderWidth: 1,
+    borderColor: '#00FFFF',
+  },
+  avatarImage: {
+    width: 30,
+    height: 30,
+    borderRadius: 20,
+  },
+  avatarTextContainer: {
+    marginLeft: 10,
+    justifyContent: 'center',
+  },
+  avatarTitle: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  logoutButton: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderWidth: 1,
+    borderColor: '#00FFFF',
+    borderRadius: 15,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    height: 56,
+    width:120,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 11,
+    shadowColor: '#00FFFF',
+    shadowOpacity: 0.6,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+  },
+  logoutText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  dashboardTitle: {
+    position: 'absolute',
+    top: 120,
+    alignSelf: 'center',
+    color: '#00FFFF',
+    fontSize: 24,
+    fontWeight: 'bold',
+    textShadowColor: '#00FFFF',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
+    zIndex: 5,
+  },
+  balanceContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginTop: 160,
+    zIndex: 5,
+  },
+  balanceImage: {
+    width: 310,
+    height: 180,
+    resizeMode: 'contain',
+  },
+  balanceTextContainer: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  totalBalanceLabel: {
+    color: '#9ae6ff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  balanceText: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: 'bold',
+  },
+  mineNowContainer: {
+    position: 'absolute',
+    bottom: 120,
+    alignSelf: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  mineNowImage: {
+    width: 280,
+    height: 130,
+    resizeMode: 'contain',
+  },
+});
 
 export default HomeScreen;

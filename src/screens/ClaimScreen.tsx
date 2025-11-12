@@ -5,6 +5,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   Animated,
+  ImageBackground,
+  ActivityIndicator,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { COLORS } from '../constants/mining';
@@ -18,45 +20,10 @@ interface ClaimScreenProps {
 const ClaimScreen: React.FC<ClaimScreenProps> = ({ navigation }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [trophyAnim] = useState(new Animated.Value(1));
   const [rewardAnim] = useState(new Animated.Value(1));
-  const [confettiAnim] = useState(new Animated.Value(0));
 
   useEffect(() => {
     loadUserData();
-    
-    // Animate trophy
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(trophyAnim, {
-          toValue: 1.1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(trophyAnim, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.delay(1000),
-      ])
-    ).start();
-
-    // Animate confetti
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(confettiAnim, {
-          toValue: 1,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(confettiAnim, {
-          toValue: 0,
-          duration: 0,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
   }, []);
 
   const loadUserData = async () => {
@@ -68,21 +35,17 @@ const ClaimScreen: React.FC<ClaimScreenProps> = ({ navigation }) => {
         navigation.replace('Signup');
         return;
       }
-      
-      // Calculate progress first to ensure currentMiningPoints is updated
+
+      // Ensure mining progress is calculated before fetching
       console.log('[ClaimScreen] Calculating final progress for wallet:', wallet);
       await api.calculateProgress(wallet);
-      
+
       console.log('[ClaimScreen] Fetching user data for wallet:', wallet);
       const userData = await api.getUser(wallet);
       console.log('[ClaimScreen] User data loaded:', userData);
       setUser(userData);
     } catch (error: any) {
-      console.error('[ClaimScreen] Failed to load user data:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
+      console.error('[ClaimScreen] Failed to load user data:', error);
       const errorMessage = error.response?.data?.error || error.message || 'Failed to load user data';
       showErrorToast(errorMessage, 'Error Loading Data');
     } finally {
@@ -92,14 +55,13 @@ const ClaimScreen: React.FC<ClaimScreenProps> = ({ navigation }) => {
 
   const handleClaim = async () => {
     if (!user) return;
-
     setLoading(true);
     try {
       console.log('[ClaimScreen] Claiming rewards for wallet:', user.wallet);
       const result = await api.claimReward(user.wallet);
       console.log('[ClaimScreen] Rewards claimed successfully');
-      
-      // Animate reward
+
+      // Reward pulse animation
       Animated.sequence([
         Animated.timing(rewardAnim, {
           toValue: 1.05,
@@ -112,17 +74,13 @@ const ClaimScreen: React.FC<ClaimScreenProps> = ({ navigation }) => {
           useNativeDriver: true,
         }),
       ]).start();
-      
+
       showSuccessToast(`${user.currentMiningPoints.toFixed(4)} tokens claimed! 🎉`, 'Rewards Claimed');
-      
-      // Redirect to Home to show Start Mining option
+
+      // Navigate back to Home
       setTimeout(() => navigation.replace('Home'), 1000);
     } catch (error: any) {
-      console.error('[ClaimScreen] Failed to claim rewards:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
+      console.error('[ClaimScreen] Failed to claim rewards:', error);
       const errorMessage = error.response?.data?.error || error.message || 'Failed to claim rewards';
       showErrorToast(errorMessage, 'Claim Failed');
     } finally {
@@ -137,65 +95,41 @@ const ClaimScreen: React.FC<ClaimScreenProps> = ({ navigation }) => {
         style={styles.container}
       >
         <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.cyan} />
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
       </LinearGradient>
     );
   }
 
-  const trophyRotation = trophyAnim.interpolate({
-    inputRange: [1, 1.1],
-    outputRange: ['0deg', '10deg'],
-  });
-
   return (
-    <LinearGradient
-      colors={[COLORS.background, COLORS.navyLight, COLORS.darkCard]}
-      style={styles.container}
+    <ImageBackground
+      source={require('../../assets/images/miningScreen/bg.png')}
+      style={styles.bg}
+      resizeMode="cover"
     >
       <View style={styles.content}>
-        {/* Trophy Icon */}
-        <Animated.View
-          style={[
-            styles.trophyContainer,
-            {
-              transform: [
-                { scale: trophyAnim },
-                { rotate: trophyRotation },
-              ],
-            },
-          ]}
-        >
-          <View style={styles.trophyIcon}>
-            <Text style={styles.trophyText}>🏆</Text>
-          </View>
-        </Animated.View>
-
         <Text style={styles.title}>MINING COMPLETE! 🎉</Text>
-        <Text style={styles.subtitle}>
-          You've successfully mined tokens!
-        </Text>
+        <Text style={styles.subtitle}>You've successfully mined tokens!</Text>
 
-        {/* Reward Display */}
-        <Animated.View
-          style={[
-            styles.rewardCard,
-            {
-              transform: [{ scale: rewardAnim }],
-            },
-          ]}
+        {/* Reward Section */}
+        <ImageBackground
+          source={require('../../assets/images/miningScreen/balance.png')}
+          style={styles.rewardBackground}
+          resizeMode="contain"
         >
-          <View style={styles.rewardHeader}>
-            <Text style={styles.rewardIcon}>✨</Text>
-            <Text style={styles.rewardLabel}>SESSION EARNINGS</Text>
-          </View>
-          <Text style={styles.rewardAmount}>
-            {user.currentMiningPoints.toFixed(4)} TOKENS
-          </Text>
-          <Text style={styles.sessionInfo}>
-            Earned in this mining session
-          </Text>
-        </Animated.View>
+          <Animated.View style={{ transform: [{ scale: rewardAnim }] }}>
+            <View style={styles.rewardHeader}>
+              <Text style={styles.rewardIcon}>✨</Text>
+              <Text style={styles.rewardLabel}>SESSION EARNINGS</Text>
+            </View>
+
+            <Text style={styles.rewardAmount}>
+              {user.currentMiningPoints.toFixed(4)} TOKENS
+            </Text>
+            <Text style={styles.sessionInfo}>Earned in this mining session</Text>
+          </Animated.View>
+        </ImageBackground>
 
         {/* Claim Button */}
         <TouchableOpacity
@@ -209,11 +143,16 @@ const ClaimScreen: React.FC<ClaimScreenProps> = ({ navigation }) => {
           </Text>
         </TouchableOpacity>
       </View>
-    </LinearGradient>
+    </ImageBackground>
   );
 };
 
 const styles = StyleSheet.create({
+  bg: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -222,39 +161,17 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 10,
   },
   loadingText: {
     fontSize: 18,
-    color: COLORS.text,
+    color: COLORS.textLight,
+    marginTop: 10,
   },
   content: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
-    zIndex: 10,
-  },
-  trophyContainer: {
-    marginBottom: 24,
-  },
-  trophyIcon: {
-    width: 112,
-    height: 112,
-    borderRadius: 56,
-    backgroundColor: COLORS.yellow,
-    borderWidth: 4,
-    borderColor: COLORS.yellowLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  trophyText: {
-    fontSize: 56,
   },
   title: {
     fontSize: 24,
@@ -269,15 +186,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 32,
   },
-  rewardCard: {
-    backgroundColor: COLORS.darkCard,
-    borderRadius: 16,
-    padding: 24,
-    borderWidth: 2,
-    borderColor: COLORS.orange,
-    marginBottom: 32,
-    width: '100%',
-    maxWidth: 400,
+  rewardBackground: {
+    width: 340,
+    height: 200,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 30,
   },
   rewardHeader: {
     flexDirection: 'row',
@@ -295,7 +210,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   rewardAmount: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: 'bold',
     color: COLORS.text,
     textAlign: 'center',
@@ -308,12 +223,12 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   claimButton: {
-    backgroundColor: COLORS.orange,
+    backgroundColor: 'rgba(0, 163, 163, 1)',
     borderRadius: 16,
     paddingVertical: 20,
     paddingHorizontal: 32,
     borderWidth: 4,
-    borderColor: COLORS.orangeLight,
+    borderColor:'rgba(44, 255, 233, 1)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
