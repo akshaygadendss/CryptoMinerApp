@@ -194,6 +194,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </View>
       </View>
 
+      {/* Leaderboard Button */}
+      <TouchableOpacity 
+        style={localStyles.leaderboardButton} 
+        onPress={() => navigation.navigate('Leaderboard')}
+        activeOpacity={0.8}
+      >
+        <Text style={localStyles.leaderboardButtonText}>🏆 Leaderboard</Text>
+      </TouchableOpacity>
+
       {/* Mine Now Button or Claim Reward Button */}
       {user?.status === 'ready_to_claim' ? (
         <TouchableOpacity 
@@ -378,6 +387,26 @@ const localStyles = StyleSheet.create({
   balanceText: {
     color: '#fff',
     fontSize: 22,
+    fontWeight: 'bold',
+  },
+  leaderboardButton: {
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderWidth: 2,
+    borderColor: '#FFD700',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    marginTop: 15,
+    shadowColor: '#FFD700',
+    shadowOpacity: 0.5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  leaderboardButtonText: {
+    color: '#FFD700',
+    fontSize: 16,
     fontWeight: 'bold',
   },
   mineNowContainer: {

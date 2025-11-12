@@ -476,4 +476,44 @@ router.get('/config', async (req, res) => {
   }
 });
 
+// Get leaderboard - top users by total earned
+router.get('/leaderboard', async (req, res) => {
+  try {
+    console.log('[GET-LEADERBOARD] Fetching leaderboard...');
+    
+    // Aggregate total earned across all sessions for each wallet
+    const leaderboard = await User.aggregate([
+      {
+        $group: {
+          _id: '$wallet',
+          totalEarned: { $sum: '$totalEarned' }
+        }
+      },
+      {
+        $sort: { totalEarned: -1 }
+      },
+      {
+        $limit: 100
+      }
+    ]);
+
+    // Add rank to each entry
+    const rankedLeaderboard = leaderboard.map((entry, index) => ({
+      rank: index + 1,
+      wallet: entry._id,
+      totalEarned: entry.totalEarned
+    }));
+
+    console.log('[GET-LEADERBOARD] Leaderboard fetched successfully:', rankedLeaderboard.length, 'entries');
+
+    res.status(200).json({ 
+      leaderboard: rankedLeaderboard,
+      count: rankedLeaderboard.length
+    });
+  } catch (error) {
+    console.error('[GET-LEADERBOARD] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

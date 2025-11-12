@@ -207,6 +207,23 @@ class API {
       throw error;
     }
   }
+
+  async getLeaderboard(): Promise<any[]> {
+    try {
+      console.log('[API] GetLeaderboard request:', { url: `${API_URL}/leaderboard` });
+      const response = await axios.get(`${API_URL}/leaderboard`);
+      console.log('[API] GetLeaderboard response:', response.data);
+      return response.data.leaderboard || [];
+    } catch (error: any) {
+      console.error('[API] GetLeaderboard error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        url: error.config?.url
+      });
+      throw error;
+    }
+  }
 }
 
 export default new API();
