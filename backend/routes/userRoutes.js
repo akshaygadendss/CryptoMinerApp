@@ -2,6 +2,7 @@ import express from 'express';
 import User from '../models/User.js';
 import MinerUser from '../models/MinerUser.js';
 import Config from '../models/Config.js';
+import AdReward from '../models/AdReward.js';
 
 const router = express.Router();
 
@@ -91,13 +92,33 @@ router.get('/user-summary/:wallet', async (req, res) => {
       }
     ]);
 
+    
+
     const totalEarnedSum = aggregation.length > 0 ? aggregation[0].totalEarnedSum : 0;
 
+    // Sum total ad rewards
+    const adRewardAggregation = await AdReward.aggregate([
+      { $match: { wallet } },
+      {
+        $group: {
+          _id: '$wallet',
+          totalAdRewards: { $sum: '$rewardedTokens' }
+        }
+      }
+    ]);
+
+    const totalAdRewards = adRewardAggregation.length > 0 ? adRewardAggregation[0].totalAdRewards : 0;
+
     const latestSession = await User.findOne({ wallet }).sort({ createdDate: -1, lastUpdated: -1 });
+
+    // Calculate total balance
+    const totalBalance = totalEarnedSum + totalAdRewards;
 
     res.status(200).json({
       wallet,
       totalEarnedSum,
+      totalAdRewards,
+      totalBalance,
       latestSession
     });
   } catch (error) {
@@ -512,6 +533,69 @@ router.get('/leaderboard', async (req, res) => {
     });
   } catch (error) {
     console.error('[GET-LEADERBOARD] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Claim ad reward - watch ad and get random tokens
+router.post('/claim-ad-reward', async (req, res) => {
+  try {
+    const { wallet } = req.body;
+    console.log('[CLAIM-AD-REWARD] Request received:', wallet);
+
+    if (!wallet) {
+      return res.status(400).json({ error: 'Wallet address is required' });
+    }
+
+    // Check if user exists
+    const minerUser = await MinerUser.findOne({ walletId: wallet });
+    if (!minerUser) {
+      return res.status(404).json({ error: 'User not registered' });
+    }
+
+    // Generate random reward: 10, 20, 30, 40, 50, or 60 tokens
+    const possibleRewards = [10, 20, 30, 40, 50, 60];
+    const randomReward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)];
+
+    // Create ad reward record
+    const adReward = new AdReward({
+      wallet,
+      rewardedTokens: randomReward,
+      claimedAt: new Date()
+    });
+
+    await adReward.save();
+    console.log('[CLAIM-AD-REWARD] Reward claimed successfully:', randomReward, 'tokens');
+
+    res.status(200).json({
+      message: 'Ad reward claimed successfully',
+      rewardedTokens: randomReward,
+      claimedAt: adReward.claimedAt
+    });
+  } catch (error) {
+    console.error('[CLAIM-AD-REWARD] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all ad rewards for a wallet
+router.get('/ad-rewards/:wallet', async (req, res) => {
+  try {
+    const { wallet } = req.params;
+    console.log('[GET-AD-REWARDS] Fetching ad rewards for:', wallet);
+
+    const adRewards = await AdReward.find({ wallet }).sort({ claimedAt: -1 });
+
+    const totalAdRewards = adRewards.reduce((sum, reward) => sum + reward.rewardedTokens, 0);
+
+    res.status(200).json({
+      wallet,
+      adRewards,
+      totalAdRewards,
+      count: adRewards.length
+    });
+  } catch (error) {
+    console.error('[GET-AD-REWARDS] Error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });

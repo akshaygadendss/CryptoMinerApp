@@ -29,7 +29,16 @@ export interface MiningProgress {
 export interface UserSummary {
   wallet: string;
   totalEarnedSum: number;
+  totalAdRewards: number;
+  totalBalance: number;
   latestSession: User | null;
+}
+
+export interface AdReward {
+  _id: string;
+  wallet: string;
+  rewardedTokens: number;
+  claimedAt: string;
 }
 
 export const isMiningComplete = (user: User | null): boolean => {
@@ -216,6 +225,43 @@ class API {
       return response.data.leaderboard || [];
     } catch (error: any) {
       console.error('[API] GetLeaderboard error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        url: error.config?.url
+      });
+      throw error;
+    }
+  }
+
+  async claimAdReward(wallet: string): Promise<{ rewardedTokens: number; claimedAt: string }> {
+    try {
+      console.log('[API] ClaimAdReward request:', { wallet, url: `${API_URL}/claim-ad-reward` });
+      const response = await axios.post(`${API_URL}/claim-ad-reward`, { wallet });
+      console.log('[API] ClaimAdReward response:', response.data);
+      return {
+        rewardedTokens: response.data.rewardedTokens,
+        claimedAt: response.data.claimedAt
+      };
+    } catch (error: any) {
+      console.error('[API] ClaimAdReward error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        url: error.config?.url
+      });
+      throw error;
+    }
+  }
+
+  async getAdRewards(wallet: string): Promise<{ adRewards: AdReward[]; totalAdRewards: number; count: number }> {
+    try {
+      console.log('[API] GetAdRewards request:', { wallet, url: `${API_URL}/ad-rewards/${wallet}` });
+      const response = await axios.get(`${API_URL}/ad-rewards/${wallet}`);
+      console.log('[API] GetAdRewards response:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('[API] GetAdRewards error:', {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status,

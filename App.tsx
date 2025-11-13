@@ -9,6 +9,7 @@ import HomeScreen from './src/screens/HomeScreen';
 import MiningScreen from './src/screens/MiningScreen';
 import ClaimScreen from './src/screens/ClaimScreen';
 import LeaderboardScreen from './src/screens/LeaderboardScreen';
+import WatchAdsScreen from './src/screens/WatchAdsScreen';
  
 const Stack = createNativeStackNavigator();
  
@@ -62,6 +63,7 @@ function App(): React.JSX.Element {
           <Stack.Screen name="Mining" component={MiningScreen} />
           <Stack.Screen name="Claim" component={ClaimScreen} />
           <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
+          <Stack.Screen name="WatchAds" component={WatchAdsScreen} />
         </Stack.Navigator>
       </NavigationContainer>
       <Toast />

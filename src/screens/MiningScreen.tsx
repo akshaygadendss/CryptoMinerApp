@@ -48,7 +48,7 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
   const loadRewardedAd = (onRewardEarned: (reward: any) => void) => {
     const adUnitId = __DEV__
       ? TestIds.REWARDED
-      : 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY';
+      : 'ca-app-pub-3644060799052014/6284342949';
     const ad = RewardedAd.createForAdRequest(adUnitId, {
       requestNonPersonalizedAdsOnly: true,
     });

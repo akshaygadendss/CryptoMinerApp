@@ -32,8 +32,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [totalBalance, setTotalBalance] = useState<number>(0);
   const [showDurationModal, setShowDurationModal] = useState(false);
   const [selectedHour, setSelectedHour] = useState(1);
+
   const [balanceAnim] = useState(new Animated.Value(1));
   const [mineNowAnim] = useState(new Animated.Value(1));
+
+  /* NEW — Ads button animation */
+  const [adsPulseAnim] = useState(new Animated.Value(1));
+
   const walletAnimRef = useRef<LottieView>(null);
 
   useEffect(() => {
@@ -47,6 +52,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }, [])
   );
 
+  /* Pulsating for balance text */
   useEffect(() => {
     if (user) {
       Animated.sequence([
@@ -64,7 +70,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   }, [user?.totalEarned]);
 
-  // 🔹 Pulse animation for mine_now / mining image
+  /* Mining button pulse */
   useEffect(() => {
     mineNowAnim.setValue(1);
     Animated.loop(
@@ -85,6 +91,27 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     ).start();
   }, [user?.status]);
 
+  /* NEW — Ads button pulse animation */
+  useEffect(() => {
+    adsPulseAnim.setValue(1);
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(adsPulseAnim, {
+          toValue: 1.08,
+          duration: 1000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(adsPulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+
   const loadUserData = async () => {
     try {
       const wallet = await api.getStoredWallet();
@@ -94,9 +121,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       }
       const userData = await api.getUser(wallet);
       setUser(userData);
+
       try {
         const summary: UserSummary = await api.getUserSummary(wallet);
-        setTotalBalance(summary.totalEarnedSum || 0);
+        setTotalBalance(summary.totalBalance || 0);
       } catch {
         setTotalBalance(userData?.totalEarned || 0);
       }
@@ -136,7 +164,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     try {
       await AsyncStorage.removeItem('wallet');
       showInfoToast('You have been logged out', 'Logged Out! 👋');
-    } catch { }
+    } catch {}
     navigation.replace('Signup');
   };
 
@@ -153,15 +181,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   return (
     <ImageBackground
       source={require('../../assets/images/homescreen/bg.png')}
-      style={[baseStyles.container, { resizeMode: 'cover' }]}
+      style={baseStyles.container}
+      resizeMode="cover"
     >
-      {/* 🔹 Avatar Card */}
+      {/* Avatar Card */}
       <View style={localStyles.avatarCard}>
         <View style={localStyles.avatarLeft}>
-          <Image
-            source={require('../../assets/images/homescreen/avatar.png')}
-            style={localStyles.avatarImage}
-          />
+          <Image source={require('../../assets/images/homescreen/avatar.png')} style={localStyles.avatarImage} />
         </View>
         <View style={localStyles.avatarTextContainer}>
           <Text style={localStyles.avatarTitle} numberOfLines={1}>
@@ -170,7 +196,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </View>
       </View>
 
-      {/* Logout Button */}
+      {/* Logout */}
       <TouchableOpacity style={localStyles.logoutButton} onPress={handleLogout}>
         <Text style={localStyles.logoutText}>LOGOUT</Text>
       </TouchableOpacity>
@@ -183,61 +209,59 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         <Image source={require('../../assets/images/homescreen/balance.png')} style={localStyles.balanceImage} />
         <View style={localStyles.balanceTextContainer}>
           <Text style={localStyles.totalBalanceLabel}>Total Balance</Text>
-          <Animated.Text
-            style={[
-              localStyles.balanceText,
-              { transform: [{ scale: balanceAnim }] },
-            ]}
-          >
+          <Animated.Text style={[localStyles.balanceText, { transform: [{ scale: balanceAnim }] }]}>
             {totalBalance.toFixed(4)} TOKENS
           </Animated.Text>
         </View>
       </View>
 
-      {/* Leaderboard Button */}
-      <TouchableOpacity 
-        style={localStyles.leaderboardButton} 
-        onPress={() => navigation.navigate('Leaderboard')}
-        activeOpacity={0.8}
-      >
-        <Text style={localStyles.leaderboardButtonText}>🏆 Leaderboard</Text>
-      </TouchableOpacity>
-
-      {/* Mine Now Button or Claim Reward Button */}
-      {user?.status === 'ready_to_claim' ? (
-        <TouchableOpacity 
-          onPress={() => navigation.navigate('Claim')} 
-          activeOpacity={0.8} 
-          style={localStyles.claimRewardButton}
+      {/* ACTION BUTTONS */}
+      <View style={localStyles.actionButtonsContainer}>
+        {/* Leaderboard */}
+        <TouchableOpacity
+          style={localStyles.leaderboardButton}
+          onPress={() => navigation.navigate('Leaderboard')}
+          activeOpacity={0.8}
         >
-          <LinearGradient
-            colors={['#FFD700', '#FFA500']}
-            style={localStyles.claimGradient}
+          <Text style={localStyles.leaderboardButtonText}>🏆 Leaderboard</Text>
+        </TouchableOpacity>
+
+        {/* WATCH ADS — NOW WITH SAME PULSE AS MINE NOW */}
+        <Animated.View style={{ transform: [{ scale: adsPulseAnim }] }}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('WatchAds')}
+            activeOpacity={0.75}
+            style={localStyles.watchAdsButtonContainer}
           >
+            <Image
+              source={require('../../assets/images/homescreen/ad_button.png')}
+              style={localStyles.watchAdsButtonImage}
+            />
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
+
+      {/* Mining or Claim Reward */}
+      {user?.status === 'ready_to_claim' ? (
+        <TouchableOpacity onPress={() => navigation.navigate('Claim')} activeOpacity={0.8} style={localStyles.claimRewardButton}>
+          <LinearGradient colors={['#FFD700', '#FFA500']} style={localStyles.claimGradient}>
             <Text style={localStyles.claimRewardText}>🎁 CLAIM REWARD</Text>
           </LinearGradient>
         </TouchableOpacity>
       ) : (
-        <TouchableOpacity 
-          onPress={handleStartMining} 
-          activeOpacity={0.8} 
-          style={localStyles.mineNowContainer}
-        >
+        <TouchableOpacity onPress={handleStartMining} activeOpacity={0.8} style={localStyles.mineNowContainer}>
           <Animated.Image
             source={
               user?.status === 'mining'
                 ? require('../../assets/images/homescreen/mining.png')
                 : require('../../assets/images/homescreen/mine_now.png')
             }
-            style={[
-              localStyles.mineNowImage,
-              { transform: [{ scale: mineNowAnim }] },
-            ]}
+            style={[localStyles.mineNowImage, { transform: [{ scale: mineNowAnim }] }]}
           />
         </TouchableOpacity>
       )}
 
-      {/* Duration Modal (unchanged) */}
+      {/* Duration Modal */}
       <Modal visible={showDurationModal} transparent animationType="slide">
         <View style={baseStyles.modalOverlay}>
           <LinearGradient colors={[COLORS.darkCard, COLORS.cardBg]} style={baseStyles.modalContent}>
@@ -247,10 +271,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               {durationOptions.map((option) => (
                 <TouchableOpacity
                   key={option.value}
-                  style={[
-                    baseStyles.optionItem,
-                    selectedHour === option.value && baseStyles.optionItemSelected,
-                  ]}
+                  style={[baseStyles.optionItem, selectedHour === option.value && baseStyles.optionItemSelected]}
                   onPress={() => setSelectedHour(option.value)}
                 >
                   <Text style={baseStyles.optionText}>{option.label}</Text>
@@ -261,16 +282,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               ))}
             </ScrollView>
             <View style={baseStyles.modalButtons}>
-              <TouchableOpacity
-                style={[baseStyles.modalButton, baseStyles.cancelButton]}
-                onPress={() => setShowDurationModal(false)}
-              >
+              <TouchableOpacity style={[baseStyles.modalButton, baseStyles.cancelButton]} onPress={() => setShowDurationModal(false)}>
                 <Text style={baseStyles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[baseStyles.modalButton, baseStyles.confirmButton]}
-                onPress={handleDurationConfirm}
-              >
+              <TouchableOpacity style={[baseStyles.modalButton, baseStyles.confirmButton]} onPress={handleDurationConfirm}>
                 <Text style={baseStyles.confirmButtonText}>Start Mining</Text>
               </TouchableOpacity>
             </View>
@@ -280,6 +295,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     </ImageBackground>
   );
 };
+
+/* ===================================== */
+/* ==========   STYLES  ================ */
+/* ===================================== */
 
 const localStyles = StyleSheet.create({
   avatarCard: {
@@ -296,11 +315,8 @@ const localStyles = StyleSheet.create({
     paddingHorizontal: 12,
     height: 56,
     zIndex: 10,
-    shadowColor: '#00FFFF',
-    shadowOpacity: 0.6,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 6,
   },
+
   avatarLeft: {
     justifyContent: 'center',
     alignItems: 'center',
@@ -310,20 +326,17 @@ const localStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#00FFFF',
   },
-  avatarImage: {
-    width: 30,
-    height: 30,
-    borderRadius: 20,
-  },
-  avatarTextContainer: {
-    marginLeft: 10,
-    justifyContent: 'center',
-  },
+
+  avatarImage: { width: 30, height: 30, borderRadius: 20 },
+
+  avatarTextContainer: { marginLeft: 10, justifyContent: 'center' },
+
   avatarTitle: {
     color: '#fff',
     fontWeight: '700',
     fontSize: 15,
   },
+
   logoutButton: {
     position: 'absolute',
     top: 40,
@@ -335,20 +348,14 @@ const localStyles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     height: 56,
-    width:120,
+    width: 120,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 11,
-    shadowColor: '#00FFFF',
-    shadowOpacity: 0.6,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 6,
   },
-  logoutText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 15,
-  },
+
+  logoutText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+
   dashboardTitle: {
     position: 'absolute',
     top: 120,
@@ -357,10 +364,10 @@ const localStyles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     textShadowColor: '#00FFFF',
-    textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 10,
     zIndex: 5,
   },
+
   balanceContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -368,47 +375,52 @@ const localStyles = StyleSheet.create({
     marginTop: 160,
     zIndex: 5,
   },
-  balanceImage: {
-    width: 310,
-    height: 180,
-    resizeMode: 'contain',
-  },
+
+  balanceImage: { width: 310, height: 180, resizeMode: 'contain' },
+
   balanceTextContainer: {
     position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  totalBalanceLabel: {
-    color: '#9ae6ff',
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 4,
+
+  totalBalanceLabel: { color: '#9ae6ff', fontSize: 14, fontWeight: '600', marginBottom: 4 },
+
+  balanceText: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
+
+  /* Action Buttons Row */
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 15,
+    gap: 15,
   },
-  balanceText: {
-    color: '#fff',
-    fontSize: 22,
-    fontWeight: 'bold',
-  },
+
   leaderboardButton: {
-    alignSelf: 'center',
     backgroundColor: 'rgba(0,0,0,0.6)',
     borderWidth: 2,
     borderColor: '#FFD700',
     borderRadius: 12,
     paddingVertical: 10,
     paddingHorizontal: 20,
-    marginTop: 15,
-    shadowColor: '#FFD700',
-    shadowOpacity: 0.5,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 6,
-    elevation: 5,
   },
-  leaderboardButtonText: {
-    color: '#FFD700',
-    fontSize: 16,
-    fontWeight: 'bold',
+
+  leaderboardButtonText: { color: '#FFD700', fontSize: 16, fontWeight: 'bold' },
+
+  /* WATCH ADS — Static image with pulse */
+  watchAdsButtonContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
+
+  watchAdsButtonImage: {
+    width: 150,
+    height: 100,
+    resizeMode: 'contain',
+  },
+
+  /* Mining Buttons */
   mineNowContainer: {
     position: 'absolute',
     bottom: 120,
@@ -416,35 +428,25 @@ const localStyles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 10,
   },
-  mineNowImage: {
-    width: 280,
-    height: 130,
-    resizeMode: 'contain',
-  },
+
+  mineNowImage: { width: 280, height: 130, resizeMode: 'contain' },
+
   claimRewardButton: {
     position: 'absolute',
     bottom: 140,
     alignSelf: 'center',
     zIndex: 10,
   },
+
   claimGradient: {
     paddingVertical: 18,
     paddingHorizontal: 40,
     borderRadius: 20,
     borderWidth: 3,
     borderColor: '#FFD700',
-    shadowColor: '#FFD700',
-    shadowOpacity: 0.8,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 8,
   },
-  claimRewardText: {
-    color: '#000',
-    fontSize: 22,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
+
+  claimRewardText: { color: '#000', fontSize: 22, fontWeight: 'bold', textAlign: 'center' },
 });
 
 export default HomeScreen;
