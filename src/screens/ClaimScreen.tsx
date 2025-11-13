@@ -12,6 +12,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { COLORS } from '../constants/mining';
 import api, { User } from '../services/api';
 import { showSuccessToast, showErrorToast } from '../utils/toast';
+import notificationService from '../services/notificationService';
 
 interface ClaimScreenProps {
   navigation: any;
@@ -60,6 +61,9 @@ const ClaimScreen: React.FC<ClaimScreenProps> = ({ navigation }) => {
       console.log('[ClaimScreen] Claiming rewards for wallet:', user.wallet);
       const result = await api.claimReward(user.wallet);
       console.log('[ClaimScreen] Rewards claimed successfully');
+
+      // Cancel any pending mining notifications since rewards are claimed
+      await notificationService.cancelMiningNotifications();
 
       // Reward pulse animation
       Animated.sequence([

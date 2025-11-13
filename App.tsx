@@ -33,7 +33,7 @@ function App(): React.JSX.Element {
     checkInitialNotification();
 
     // Handle notification press while app is in foreground
-    const unsubscribe = notifee.onForegroundEvent(({ type, detail }) => {
+    const unsubscribe = notifee.onForegroundEvent(({ type }) => {
       if (type === EventType.PRESS) {
         console.log('[App] Notification pressed in foreground');
         if (navigationRef.current) {

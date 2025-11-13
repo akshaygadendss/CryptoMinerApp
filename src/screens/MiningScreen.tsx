@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   ImageBackground,
   ScrollView,
-  Image,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { COLORS } from '../constants/mining';
@@ -44,7 +43,6 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
   const [rewardedAd, setRewardedAd] = useState<RewardedAd | null>(null);
   const progressAnim = useRef(new Animated.Value(0)).current;
   const tokensAnim = useRef(new Animated.Value(1)).current;
-  const notificationScheduled = useRef(false);
 
   // Load Rewarded Ad
   const loadRewardedAd = (onRewardEarned: (reward: any) => void) => {

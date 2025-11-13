@@ -36,6 +36,18 @@ class NotificationService {
    */
   async requestPermissions() {
     const settings = await notifee.requestPermission();
+    console.log('[Notifee] Permission settings:', settings);
+    
+    // Check for exact alarm permission on Android 12+
+    if (Platform.OS === 'android') {
+      try {
+        const alarmPermission = await notifee.getNotificationSettings();
+        console.log('[Notifee] Alarm permission:', alarmPermission);
+      } catch (error) {
+        console.warn('[Notifee] Could not check alarm permission:', error);
+      }
+    }
+    
     return settings.authorizationStatus >= 1; // 1 = authorized
   }
 

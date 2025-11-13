@@ -44,7 +44,7 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
     setLoading(true);
     try {
       await api.signup(wallet.trim());
-      showSuccessToast('Welcome to Crypto Mining Village! 🎉', 'Account Created');
+      showSuccessToast('Welcome to Crypto Mining Village! 🎉', 'Welcome');
       navigation.replace('Home');
     } catch (error: any) {
       const errorMessage = error.response?.data?.error || error.message || 'Failed to signup';
