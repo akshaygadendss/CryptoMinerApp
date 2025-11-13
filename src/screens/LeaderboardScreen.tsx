@@ -17,6 +17,8 @@ import { showErrorToast } from '../utils/toast';
 interface LeaderboardEntry {
   wallet: string;
   totalEarned: number;
+  totalAdRewards: number;
+  totalBalance: number;
   rank: number;
 }
 
@@ -72,7 +74,7 @@ const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({ navigation }) => 
             : item.wallet}
         </Text>
         <Text style={[styles.tokensText, isCurrentUser && styles.currentUserText]}>
-          {item.totalEarned.toFixed(2)}
+          {item.totalBalance.toFixed(2)}
         </Text>
       </ImageBackground>
     );
@@ -137,7 +139,7 @@ const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({ navigation }) => 
                         ? `${user.wallet.slice(0, 6)}...${user.wallet.slice(-3)}`
                         : user.wallet}
                     </Text>
-                    <Text style={styles.topTokenText}>{user.totalEarned.toFixed(2)}</Text>
+                    <Text style={styles.topTokenText}>{user.totalBalance.toFixed(2)}</Text>
                   </View>
                 </View>
               ))}
@@ -150,7 +152,7 @@ const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({ navigation }) => 
               data={leaderboard.slice(2)} // start from 3rd rank
               renderItem={renderLeaderboardItem}
               keyExtractor={(item) => item.wallet}
-              showsVerticalScrollIndicator={true}
+              showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.listContent}
               initialNumToRender={4}
               scrollEnabled={true}
@@ -283,7 +285,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   rankText: {
-    color: '#FFD700',
+    color: '#f9f8f5ff',
     fontSize: 16,
     fontWeight: 'bold',
     width: 50,

@@ -171,7 +171,7 @@ const WatchAdsScreen: React.FC<WatchAdsScreenProps> = ({ navigation }) => {
       <View style={styles.container}>
 
         <Animated.Text style={[styles.title, { transform: [{ scale: pulseAnim }] }]}>
-          WATCH & EARN
+          Watch Ad & Earn Rewards
         </Animated.Text>
 
         <Text style={styles.subtitle}>Watch an ad to earn free tokens ✨</Text>
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
   title: {
-    fontSize: 32,
+    fontSize: 30,
     fontWeight: '900',
     color: '#4DF8FF',
     marginBottom: 8,
@@ -314,8 +314,8 @@ const styles = StyleSheet.create({
   },
 
   watchButton: {
-    width: '80%',
-    paddingVertical: 16,
+    width: '60%',
+    paddingVertical: 12,
     borderRadius: 18,
     backgroundColor: '#0ff',
     borderWidth: 2,
@@ -331,7 +331,19 @@ const styles = StyleSheet.create({
     color: '#003640',
   },
 
-  backButton: { marginTop: 18 },
+  backButton: { marginTop: 18,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderWidth: 1,
+    borderColor: '#00FFFF',
+    borderRadius: 15,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    height: 45,
+    width: 120,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 11,
+   },
   backText: { color: '#AEEFFF', fontSize: 16 },
 
   modalOverlay: {

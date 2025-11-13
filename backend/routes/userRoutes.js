@@ -497,32 +497,68 @@ router.get('/config', async (req, res) => {
   }
 });
 
-// Get leaderboard - top users by total earned
+// Get leaderboard - top users by total balance (mining + ad rewards)
 router.get('/leaderboard', async (req, res) => {
   try {
     console.log('[GET-LEADERBOARD] Fetching leaderboard...');
     
-    // Aggregate total earned across all sessions for each wallet
-    const leaderboard = await User.aggregate([
+    // Aggregate total earned from mining across all sessions for each wallet
+    const miningEarnings = await User.aggregate([
       {
         $group: {
           _id: '$wallet',
           totalEarned: { $sum: '$totalEarned' }
         }
-      },
-      {
-        $sort: { totalEarned: -1 }
-      },
-      {
-        $limit: 100
       }
     ]);
 
-    // Add rank to each entry
-    const rankedLeaderboard = leaderboard.map((entry, index) => ({
-      rank: index + 1,
+    // Aggregate total ad rewards for each wallet
+    const adRewards = await AdReward.aggregate([
+      {
+        $group: {
+          _id: '$wallet',
+          totalAdRewards: { $sum: '$rewardedTokens' }
+        }
+      }
+    ]);
+
+    // Create a map of wallet to ad rewards
+    const adRewardsMap = {};
+    adRewards.forEach(entry => {
+      adRewardsMap[entry._id] = entry.totalAdRewards;
+    });
+
+    // Combine mining earnings and ad rewards
+    const combinedData = miningEarnings.map(entry => ({
       wallet: entry._id,
-      totalEarned: entry.totalEarned
+      totalEarned: entry.totalEarned,
+      totalAdRewards: adRewardsMap[entry._id] || 0,
+      totalBalance: entry.totalEarned + (adRewardsMap[entry._id] || 0)
+    }));
+
+    // Add wallets that only have ad rewards (no mining)
+    adRewards.forEach(entry => {
+      if (!miningEarnings.find(m => m._id === entry._id)) {
+        combinedData.push({
+          wallet: entry._id,
+          totalEarned: 0,
+          totalAdRewards: entry.totalAdRewards,
+          totalBalance: entry.totalAdRewards
+        });
+      }
+    });
+
+    // Sort by total balance (descending) and limit to top 100
+    combinedData.sort((a, b) => b.totalBalance - a.totalBalance);
+    const topUsers = combinedData.slice(0, 100);
+
+    // Add rank to each entry
+    const rankedLeaderboard = topUsers.map((entry, index) => ({
+      rank: index + 1,
+      wallet: entry.wallet,
+      totalEarned: entry.totalEarned,
+      totalAdRewards: entry.totalAdRewards,
+      totalBalance: entry.totalBalance
     }));
 
     console.log('[GET-LEADERBOARD] Leaderboard fetched successfully:', rankedLeaderboard.length, 'entries');
