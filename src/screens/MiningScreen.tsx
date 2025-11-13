@@ -411,28 +411,7 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
           </Text>
         </TouchableOpacity>
 
-        {/* Test Notification Button - Remove this after testing */}
-        {__DEV__ && (
-          <TouchableOpacity
-            onPress={async () => {
-              await notificationService.displayImmediateNotification(
-                'Test Notification',
-                'This is a test notification'
-              );
-              showSuccessToast('Test notification sent!');
-            }}
-            style={{
-              marginTop: 15,
-              padding: 10,
-              backgroundColor: 'red',
-              borderRadius: 8,
-            }}
-          >
-            <Text style={{ color: 'white', fontWeight: 'bold' }}>
-              🔔 Test Notification
-            </Text>
-          </TouchableOpacity>
-        )}
+
       </ScrollView>
 
       {/* Modals (Unchanged) */}

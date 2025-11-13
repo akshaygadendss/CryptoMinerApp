@@ -135,7 +135,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const handleLogout = async () => {
     try {
       await AsyncStorage.removeItem('wallet');
-      showInfoToast('You have been logged out', 'Goodbye! 👋');
+      showInfoToast('You have been logged out', 'Logged Out! 👋');
     } catch { }
     navigation.replace('Signup');
   };
