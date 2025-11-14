@@ -308,23 +308,6 @@ class API {
     }
   }
 
-  async getReferralCode(wallet: string): Promise<{ wallet: string; referralCode: string }> {
-    try {
-      console.log('[API] GetReferralCode request:', { wallet, url: `${API_URL}/referral-code/${wallet}` });
-      const response = await axios.get(`${API_URL}/referral-code/${wallet}`);
-      console.log('[API] GetReferralCode response:', response.data);
-      return response.data;
-    } catch (error: any) {
-      console.error('[API] GetReferralCode error:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        url: error.config?.url
-      });
-      throw error;
-    }
-  }
-
   async getReferralNotifications(wallet: string): Promise<{ notifications: any[]; count: number }> {
     try {
       console.log('[API] GetReferralNotifications request:', { wallet, url: `${API_URL}/referral-notifications/${wallet}` });

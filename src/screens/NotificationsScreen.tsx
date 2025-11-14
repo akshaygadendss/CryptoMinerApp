@@ -111,6 +111,15 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation })
           <Text style={styles.headerTitle}>🔔 Notifications</Text>
         </View>
 
+        {/* SIMPLE • SMALL • MATCHES BACK BUTTON STYLE */}
+        {notifications.length > 0 && (
+          <View style={styles.totalRewardsSimpleCard}>
+            <Text style={styles.totalRewardsSimpleText}>
+              Total Referral Rewards: {notifications.length * 200} Tokens
+            </Text>
+          </View>
+        )}
+
         {notifications.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyIcon}>🔕</Text>
@@ -130,7 +139,6 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation })
         )}
       </View>
 
-      {/* Banner Ad at Bottom */}
       <View style={globalStyles.bannerAdContainerBottom}>
         <BannerAd
           unitId={__DEV__ ? TestIds.BANNER : 'ca-app-pub-3644060799052014/8537781821'}
@@ -154,6 +162,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
   },
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -165,10 +174,12 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.cyan,
     marginRight: 15,
   },
   backButtonText: {
-    color: COLORS.cyan,
+    color: COLORS.text,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -177,14 +188,34 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: COLORS.text,
   },
+
   loadingText: {
     fontSize: 16,
     color: COLORS.textLight,
     marginTop: 10,
   },
+
+  /* NEW SIMPLE TOTAL REWARDS CARD */
+  totalRewardsSimpleCard: {
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.cyan,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  totalRewardsSimpleText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+
   listContent: {
     paddingBottom: 100,
   },
+
   notificationCard: {
     backgroundColor: COLORS.cardBg,
     borderRadius: 16,
@@ -234,6 +265,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#999',
   },
+
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',

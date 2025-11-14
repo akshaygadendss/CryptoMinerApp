@@ -26,7 +26,6 @@ interface ReferralScreenProps {
 
 const ReferralScreen: React.FC<ReferralScreenProps> = ({ navigation }) => {
   const [wallet, setWallet] = useState<string>('');
-  const [myReferralCode, setMyReferralCode] = useState<string>('');
   const [inputReferralCode, setInputReferralCode] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [hasUsedReferral, setHasUsedReferral] = useState(false);
@@ -41,10 +40,6 @@ const ReferralScreen: React.FC<ReferralScreenProps> = ({ navigation }) => {
       const storedWallet = await api.getStoredWallet();
       if (storedWallet) {
         setWallet(storedWallet);
-        
-        // Get user's referral code
-        const codeData = await api.getReferralCode(storedWallet);
-        setMyReferralCode(codeData.referralCode);
         
         // Check if user has already used a referral code
         const referralStatus = await api.checkReferral(storedWallet);
@@ -72,7 +67,7 @@ const ReferralScreen: React.FC<ReferralScreenProps> = ({ navigation }) => {
 
     setLoading(true);
     try {
-      const result = await api.applyReferralCode(wallet, inputReferralCode.trim().toUpperCase());
+      const result = await api.applyReferralCode(wallet, inputReferralCode.trim());
       showSuccessToast(`Referral applied! ${result.rewardedTokens} tokens added to referrer!`);
       setHasUsedReferral(true);
       setInputReferralCode('');
@@ -90,11 +85,11 @@ const ReferralScreen: React.FC<ReferralScreenProps> = ({ navigation }) => {
   };
 
   const handleShareReferral = async () => {
-    if (!myReferralCode) return;
+    if (!wallet) return;
 
     try {
       await Share.share({
-        message: `Join CryptoMiner and use my referral code to get started!\n\nReferral Code: ${myReferralCode}\n\nDownload the app now!`,
+        message: `Join CryptoMiner and use my referral code to get started!\n\nReferral Code: ${wallet}\n\nDownload the app now!`,
         title: 'Join CryptoMiner',
       });
     } catch (error) {
@@ -103,9 +98,9 @@ const ReferralScreen: React.FC<ReferralScreenProps> = ({ navigation }) => {
   };
 
   const handleCopyReferral = () => {
-    if (!myReferralCode) return;
+    if (!wallet) return;
     
-    Clipboard.setString(myReferralCode);
+    Clipboard.setString(wallet);
     showSuccessToast('Referral code copied to clipboard!');
   };
 
@@ -143,7 +138,7 @@ const ReferralScreen: React.FC<ReferralScreenProps> = ({ navigation }) => {
           <Text style={styles.cardTitle}>YOUR REFERRAL CODE</Text>
           <View style={styles.codeContainer}>
             <Text style={styles.codeText} numberOfLines={1}>
-              {myReferralCode || 'Loading...'}
+              {wallet || 'Loading...'}
             </Text>
           </View>
           
@@ -152,14 +147,14 @@ const ReferralScreen: React.FC<ReferralScreenProps> = ({ navigation }) => {
               style={[styles.actionButton, styles.copyButton]}
               onPress={handleCopyReferral}
             >
-              <Text style={styles.actionButtonText}>📋 COPY</Text>
+              <Text style={styles.actionButtonText}> COPY</Text>
             </TouchableOpacity>
             
             <TouchableOpacity
               style={[styles.actionButton, styles.shareButton]}
               onPress={handleShareReferral}
             >
-              <Text style={styles.actionButtonText}>📤 SHARE</Text>
+              <Text style={styles.actionButtonText}> SHARE</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -169,18 +164,17 @@ const ReferralScreen: React.FC<ReferralScreenProps> = ({ navigation }) => {
           <View style={styles.card}>
             <Text style={styles.cardTitle}>ENTER REFERRAL CODE</Text>
             <Text style={styles.cardSubtitle}>
-              Enter a friend's wallet address to give them 200 tokens!
+              Enter a friend's referral code (wallet address) to give them 200 tokens!
             </Text>
             
             <TextInput
               style={styles.input}
-              placeholder="Enter 6-character code..."
+              placeholder="Enter referral code (wallet address)..."
               placeholderTextColor="#666"
               value={inputReferralCode}
               onChangeText={setInputReferralCode}
-              autoCapitalize="characters"
+              autoCapitalize="none"
               autoCorrect={false}
-              maxLength={6}
             />
             
             <TouchableOpacity
