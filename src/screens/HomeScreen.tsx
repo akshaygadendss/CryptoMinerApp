@@ -478,7 +478,7 @@ const localStyles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: 'row',
-    backgroundColor: 'rgba(0,0,0,0.9)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
     borderTopWidth: 2,
     borderTopColor: '#00FFFF',
     paddingVertical: 12,
