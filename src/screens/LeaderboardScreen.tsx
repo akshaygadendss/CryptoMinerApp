@@ -13,6 +13,11 @@ import LinearGradient from 'react-native-linear-gradient';
 import { COLORS } from '../constants/mining';
 import api from '../services/api';
 import { showErrorToast } from '../utils/toast';
+import {
+  BannerAd,
+  BannerAdSize,
+  TestIds,
+} from 'react-native-google-mobile-ads';
 
 interface LeaderboardEntry {
   wallet: string;
@@ -158,6 +163,17 @@ const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({ navigation }) => 
               scrollEnabled={true}
             />
           </View>
+        </View>
+
+        {/* Banner Ad at Bottom */}
+        <View style={{ position: 'absolute', bottom: 15, width: '100%', alignItems: 'center', zIndex: 5 }}>
+          <BannerAd
+            unitId={__DEV__ ? TestIds.BANNER : 'ca-app-pub-3644060799052014/8537781821'}
+            size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+            requestOptions={{
+              requestNonPersonalizedAdsOnly: true,
+            }}
+          />
         </View>
       </LinearGradient>
     </ImageBackground>

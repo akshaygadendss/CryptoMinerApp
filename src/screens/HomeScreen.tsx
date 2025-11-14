@@ -22,6 +22,11 @@ import api, { User, UserSummary } from '../services/api';
 import { useConfig } from '../hooks/useConfig';
 import { styles as baseStyles } from './HomeScreen.styles';
 import { showSuccessToast, showErrorToast, showInfoToast } from '../utils/toast';
+import {
+  BannerAd,
+  BannerAdSize,
+  TestIds,
+} from 'react-native-google-mobile-ads';
 
 interface HomeScreenProps {
   navigation: any;
@@ -217,6 +222,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </View>
       </View>
 
+      {/* Banner Ad */}
+      <View style={{ alignItems: 'center', marginVertical: 2 }}>
+        <BannerAd
+          unitId={__DEV__ ? TestIds.BANNER : 'ca-app-pub-3644060799052014/8537781821'}
+          size={BannerAdSize.LARGE_BANNER}
+          requestOptions={{
+            requestNonPersonalizedAdsOnly: true,
+          }}
+        />
+      </View>
+
       {/* ACTION BUTTONS */}
       <View style={localStyles.actionButtonsContainer}>
 
@@ -404,7 +420,7 @@ const localStyles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 15,
+    marginTop: 5,
     gap: 25, // <-- Extra spacing between buttons
   },
 
@@ -445,7 +461,7 @@ const localStyles = StyleSheet.create({
   /* Mining Buttons */
   mineNowContainer: {
     position: 'absolute',
-    bottom: 120,
+    bottom: 80,
     alignSelf: 'center',
   },
 

@@ -16,6 +16,8 @@ import {
   RewardedAdEventType,
   AdEventType,
   TestIds,
+  BannerAd,
+  BannerAdSize,
 } from 'react-native-google-mobile-ads';
 import LottieView from 'lottie-react-native';
 
@@ -274,6 +276,17 @@ const WatchAdsScreen: React.FC<WatchAdsScreenProps> = ({ navigation }) => {
           </Animated.View>
         </View>
       </Modal>
+
+      {/* Banner Ad at Bottom */}
+      <View style={{ position: 'absolute', bottom: 15, width: '100%', alignItems: 'center', zIndex: 5 }}>
+        <BannerAd
+          unitId={__DEV__ ? TestIds.BANNER : 'ca-app-pub-3644060799052014/8537781821'}
+          size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+          requestOptions={{
+            requestNonPersonalizedAdsOnly: true,
+          }}
+        />
+      </View>
 
     </ImageBackground>
   );

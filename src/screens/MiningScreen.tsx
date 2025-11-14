@@ -21,6 +21,10 @@ import {
   AdEventType,
   TestIds,
 } from 'react-native-google-mobile-ads';
+import {
+  BannerAd,
+  BannerAdSize,
+} from 'react-native-google-mobile-ads';
 
 import notificationService from '../services/notificationService';
 
@@ -262,7 +266,7 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
             alignItems: 'center',
             justifyContent: 'center',
             paddingHorizontal: 25,
-            marginBottom: 30,
+            marginBottom: 1,
           }}
           resizeMode="contain"
         >
@@ -343,6 +347,17 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
           </View>
         </ImageBackground>
 
+        {/* Banner Ad */}
+        <View style={{ alignItems: 'center', marginBottom: 20 }}>
+          <BannerAd
+            unitId={__DEV__ ? TestIds.BANNER : 'ca-app-pub-3644060799052014/8537781821'}
+            size={BannerAdSize.LARGE_BANNER}
+            requestOptions={{
+              requestNonPersonalizedAdsOnly: true,
+            }}
+          />
+        </View>
+
         {/* Balance Section */}
         <ImageBackground
           source={require('../../assets/images/miningScreen/balance.png')}
@@ -389,7 +404,7 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
         {/* Back Button */}
         <TouchableOpacity
           style={{
-            marginTop: 30,
+            marginTop: 15,
             backgroundColor: '#00FFFF',
             borderRadius: 12,
             paddingVertical: 14,
