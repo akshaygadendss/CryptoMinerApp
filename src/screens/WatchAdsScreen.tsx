@@ -42,7 +42,6 @@ const WatchAdsScreen: React.FC<WatchAdsScreenProps> = ({ navigation }) => {
   useEffect(() => {
     startPulseAnimation();
     loadWallet();
-    loadRewardedAd();
   }, []);
 
   const startPulseAnimation = () => {
@@ -63,7 +62,6 @@ const WatchAdsScreen: React.FC<WatchAdsScreenProps> = ({ navigation }) => {
   };
 
   const loadRewardedAd = () => {
-    setAdLoading(true);
     setLottieFailed(false);
 
     const adUnitId = __DEV__ ? TestIds.REWARDED : 'ca-app-pub-3644060799052014/6284342949';
@@ -74,6 +72,12 @@ const WatchAdsScreen: React.FC<WatchAdsScreenProps> = ({ navigation }) => {
       setAdLoading(false);
       setLottieLoading(false);
       setLottieFailed(false);
+      // Automatically show ad once loaded
+      setTimeout(() => {
+        if (ad) {
+          handleWatchAdDirectly(ad);
+        }
+      }, 100);
     });
 
     ad.addAdEventListener(AdEventType.ERROR, () => {
@@ -87,6 +91,25 @@ const WatchAdsScreen: React.FC<WatchAdsScreenProps> = ({ navigation }) => {
     ad.load();
   };
 
+  const handleWatchAdDirectly = (ad: RewardedAd) => {
+    if (!wallet) return;
+
+    setLoading(true);
+
+    ad.addAdEventListener(RewardedAdEventType.EARNED_REWARD, async () => {
+      await claimRewardDirectly();
+    });
+
+    ad.addAdEventListener(AdEventType.CLOSED, () => {
+      setLoading(false);
+      setRewardedAd(null);
+      setAdLoading(false);
+      setLottieLoading(false);
+    });
+
+    ad.show();
+  };
+
   const tryAdLoadFromAnimation = () => {
     setLottieLoading(true);
     setLottieFailed(false);
@@ -94,25 +117,31 @@ const WatchAdsScreen: React.FC<WatchAdsScreenProps> = ({ navigation }) => {
   };
 
   const handleAnimationPress = () => {
-    if (adLoading && !rewardedAd) {
-      setLottieLoading(true);
-      return;
-    }
-
-    if (!rewardedAd) {
+    // Start loading ad when animation is clicked
+    if (!rewardedAd && !adLoading) {
       setLottieLoading(true);
       tryAdLoadFromAnimation();
       return;
     }
 
-    handleWatchAd();
+    // If ad is ready, show it
+    if (rewardedAd) {
+      handleWatchAd();
+    }
   };
 
   const handleWatchAd = async () => {
     if (!wallet) return showErrorToast('Wallet not found');
 
-    if (!rewardedAd) return tryAdLoadFromAnimation();
+    // If ad not loaded yet, start loading
+    if (!rewardedAd) {
+      setAdLoading(true);
+      setLottieLoading(true);
+      loadRewardedAd();
+      return;
+    }
 
+    // Ad is ready, show it
     setLoading(true);
 
     rewardedAd.addAdEventListener(RewardedAdEventType.EARNED_REWARD, async () => {
@@ -121,7 +150,9 @@ const WatchAdsScreen: React.FC<WatchAdsScreenProps> = ({ navigation }) => {
 
     rewardedAd.addAdEventListener(AdEventType.CLOSED, () => {
       setLoading(false);
-      loadRewardedAd();
+      setRewardedAd(null);
+      setAdLoading(false);
+      setLottieLoading(false);
     });
 
     rewardedAd.show();
@@ -185,7 +216,7 @@ const WatchAdsScreen: React.FC<WatchAdsScreenProps> = ({ navigation }) => {
             {lottieLoading ? (
               <View style={{ alignItems: 'center' }}>
                 <ActivityIndicator size="large" color="#0ff" />
-                <Text style={styles.loadingText}>Ad Loading...</Text>
+                <Text style={styles.loadingText}>Loading Ad...</Text>
               </View>
             ) : lottieFailed ? (
               <View style={{ alignItems: 'center' }}>

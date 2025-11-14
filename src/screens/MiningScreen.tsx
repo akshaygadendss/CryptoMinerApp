@@ -21,6 +21,7 @@ import {
   AdEventType,
   TestIds,
 } from 'react-native-google-mobile-ads';
+
 import notificationService from '../services/notificationService';
 
 interface MiningScreenProps {

@@ -1,7 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = 'http://192.168.1.39:3000/api';
+const API_URL = 'http://192.168.1.47:3000/api';
 //const API_URL = 'http://10.97.121.196:3000/api';
 
 export interface User {
