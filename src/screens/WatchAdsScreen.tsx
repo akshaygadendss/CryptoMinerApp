@@ -19,6 +19,7 @@ import {
   BannerAd,
   BannerAdSize,
 } from 'react-native-google-mobile-ads';
+import { useFocusEffect } from '@react-navigation/native';
 import LottieView from 'lottie-react-native';
 
 interface WatchAdsScreenProps {
@@ -27,19 +28,29 @@ interface WatchAdsScreenProps {
 
 const WatchAdsScreen: React.FC<WatchAdsScreenProps> = ({ navigation }) => {
   const [wallet, setWallet] = useState<string>('');
-  const [loading, setLoading] = useState(false); // reward claiming / ad display
-  const [adLoading, setAdLoading] = useState(false); // ad request loading
+  const [loading, setLoading] = useState(false);
+  const [adLoading, setAdLoading] = useState(false);
   const [rewardedAd, setRewardedAd] = useState<RewardedAd | null>(null);
 
   const [showRewardModal, setShowRewardModal] = useState(false);
   const [earnedTokens, setEarnedTokens] = useState(0);
-
   const [scaleAnim] = useState(new Animated.Value(1));
   const [pulseAnim] = useState(new Animated.Value(1));
 
-  // Lottie area loading states
+  // Lottie section
   const [lottieLoading, setLottieLoading] = useState(false);
   const [lottieFailed, setLottieFailed] = useState(false);
+
+  // NEW: banner show/hide state
+  const [showBanner, setShowBanner] = useState(true);
+
+  // Auto-show banner again when returning to screen
+  useFocusEffect(
+    React.useCallback(() => {
+      setShowBanner(true);
+      return () => {};
+    }, [])
+  );
 
   useEffect(() => {
     startPulseAnimation();
@@ -74,11 +85,10 @@ const WatchAdsScreen: React.FC<WatchAdsScreenProps> = ({ navigation }) => {
       setAdLoading(false);
       setLottieLoading(false);
       setLottieFailed(false);
-      // Automatically show ad once loaded
+
+      // Auto-show after load
       setTimeout(() => {
-        if (ad) {
-          handleWatchAdDirectly(ad);
-        }
+        if (ad) handleWatchAdDirectly(ad);
       }, 100);
     });
 
@@ -112,30 +122,19 @@ const WatchAdsScreen: React.FC<WatchAdsScreenProps> = ({ navigation }) => {
     ad.show();
   };
 
-  const tryAdLoadFromAnimation = () => {
-    setLottieLoading(true);
-    setLottieFailed(false);
-    loadRewardedAd();
-  };
-
   const handleAnimationPress = () => {
-    // Start loading ad when animation is clicked
     if (!rewardedAd && !adLoading) {
       setLottieLoading(true);
-      tryAdLoadFromAnimation();
+      loadRewardedAd();
       return;
     }
 
-    // If ad is ready, show it
-    if (rewardedAd) {
-      handleWatchAd();
-    }
+    if (rewardedAd) handleWatchAd();
   };
 
   const handleWatchAd = async () => {
     if (!wallet) return showErrorToast('Wallet not found');
 
-    // If ad not loaded yet, start loading
     if (!rewardedAd) {
       setAdLoading(true);
       setLottieLoading(true);
@@ -143,7 +142,6 @@ const WatchAdsScreen: React.FC<WatchAdsScreenProps> = ({ navigation }) => {
       return;
     }
 
-    // Ad is ready, show it
     setLoading(true);
 
     rewardedAd.addAdEventListener(RewardedAdEventType.EARNED_REWARD, async () => {
@@ -192,7 +190,6 @@ const WatchAdsScreen: React.FC<WatchAdsScreenProps> = ({ navigation }) => {
     navigation.navigate('Home');
   };
 
-  // 💠 NEW → Combined loading flag (Option C)
   const isButtonLoading = loading || adLoading || lottieLoading;
 
   return (
@@ -202,7 +199,6 @@ const WatchAdsScreen: React.FC<WatchAdsScreenProps> = ({ navigation }) => {
       resizeMode="cover"
     >
       <View style={styles.container}>
-
         <Animated.Text style={[styles.title, { transform: [{ scale: pulseAnim }] }]}>
           Watch Ad & Earn Rewards
         </Animated.Text>
@@ -213,7 +209,7 @@ const WatchAdsScreen: React.FC<WatchAdsScreenProps> = ({ navigation }) => {
         <Animated.View style={[styles.rewardCard, { transform: [{ scale: pulseAnim }] }]}>
           <Text style={styles.rewardTitle}>Tap the gift box to earn free tokens</Text>
 
-          {/* Lottie area */}
+          {/* Lottie section */}
           <View style={{ alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
             {lottieLoading ? (
               <View style={{ alignItems: 'center' }}>
@@ -242,7 +238,7 @@ const WatchAdsScreen: React.FC<WatchAdsScreenProps> = ({ navigation }) => {
           </View>
         </Animated.View>
 
-        {/* Watch Ad Button — FULLY UPDATED */}
+        {/* Watch Button */}
         <TouchableOpacity
           style={[styles.watchButton, isButtonLoading && styles.disabled]}
           onPress={handleWatchAd}
@@ -263,7 +259,7 @@ const WatchAdsScreen: React.FC<WatchAdsScreenProps> = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Reward Modal */}
+      {/* Modal */}
       <Modal visible={showRewardModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <Animated.View style={[styles.modalCard, { transform: [{ scale: scaleAnim }] }]}>
@@ -277,24 +273,48 @@ const WatchAdsScreen: React.FC<WatchAdsScreenProps> = ({ navigation }) => {
         </View>
       </Modal>
 
-      {/* Banner Ad at Bottom */}
-      <View style={{ position: 'absolute', bottom: 15, width: '100%', alignItems: 'center', zIndex: 5 }}>
-        <BannerAd
-          unitId={__DEV__ ? TestIds.BANNER : 'ca-app-pub-3644060799052014/8537781821'}
-          size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
-          requestOptions={{
-            requestNonPersonalizedAdsOnly: true,
+      {/* Banner Ad with Close Button */}
+      {showBanner && (
+        <View
+          style={{
+            position: 'absolute',
+            bottom: 15,
+            width: '100%',
+            alignItems: 'center',
+            zIndex: 10,
           }}
-        />
-      </View>
+        >
+          {/* Close button */}
+          <TouchableOpacity
+            onPress={() => setShowBanner(false)}
+            style={{
+              position: 'absolute',
+              top: -30,
+              right: 10,
+              backgroundColor: 'rgba(0,0,0,0.6)',
+              padding: 4,
+              borderRadius: 12,
+              zIndex: 20,
+            }}
+          >
+            <Text style={{ color: 'white', fontSize: 14, fontWeight: 'bold' }}>✕</Text>
+          </TouchableOpacity>
 
+          <BannerAd
+            unitId={__DEV__ ? TestIds.BANNER : 'ca-app-pub-3644060799052014/8537781821'}
+            size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+            requestOptions={{
+              requestNonPersonalizedAdsOnly: true,
+            }}
+          />
+        </View>
+      )}
     </ImageBackground>
   );
 };
 
 const styles = StyleSheet.create({
   bg: { flex: 1 },
-
   container: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
   title: {
@@ -375,7 +395,8 @@ const styles = StyleSheet.create({
     color: '#003640',
   },
 
-  backButton: { marginTop: 18,
+  backButton: {
+    marginTop: 18,
     backgroundColor: 'rgba(0,0,0,0.4)',
     borderWidth: 1,
     borderColor: '#00FFFF',
@@ -387,7 +408,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 11,
-   },
+  },
+
   backText: { color: '#AEEFFF', fontSize: 16 },
 
   modalOverlay: {

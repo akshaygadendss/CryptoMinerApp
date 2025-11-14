@@ -18,6 +18,7 @@ import {
   BannerAdSize,
   TestIds,
 } from 'react-native-google-mobile-ads';
+import { useFocusEffect } from '@react-navigation/native';
 
 interface LeaderboardEntry {
   wallet: string;
@@ -35,6 +36,17 @@ const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({ navigation }) => 
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUserWallet, setCurrentUserWallet] = useState<string>('');
+
+  // NEW — Banner visibility
+  const [showBanner, setShowBanner] = useState(true);
+
+  // Show banner again whenever user visits this screen
+  useFocusEffect(
+    React.useCallback(() => {
+      setShowBanner(true);
+      return () => {};
+    }, [])
+  );
 
   useEffect(() => {
     loadLeaderboard();
@@ -61,12 +73,11 @@ const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({ navigation }) => 
     const medalEmoji =
       item.rank === 1 ? '🥇' : item.rank === 2 ? '🥈' : item.rank === 3 ? '🥉' : '';
 
-    // ✅ Each row now has leaderboard_card.png as background
     return (
       <ImageBackground
         source={require('../../assets/images/leaderboard/leaderboard_card.png')}
         style={[styles.leaderboardItem, isCurrentUser && styles.currentUserItem]}
-        imageStyle={styles.cardBackgroundImage} // styling for image itself
+        imageStyle={styles.cardBackgroundImage}
         resizeMode="stretch"
       >
         <Text style={styles.rankText}>{medalEmoji || `#${item.rank}`}</Text>
@@ -118,10 +129,10 @@ const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({ navigation }) => 
             resizeMode="contain"
           />
 
-          {/* 🔹 Leaderboard Title on Statue */}
+          {/* Leaderboard Title */}
           <Text style={styles.leaderboardTitle}>Leaderboard</Text>
 
-          {/* Top 2 users (Hexagons) */}
+          {/* Top 2 */}
           {topTwo.length > 0 && (
             <View style={styles.topTwoContainer}>
               {topTwo.map((user, index) => (
@@ -151,10 +162,10 @@ const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({ navigation }) => 
             </View>
           )}
 
-          {/* 🔹 Scrollable Leaderboard List (Ranks 3 and beyond) */}
+          {/* Leaderboard List */}
           <View style={styles.listWrapper}>
             <FlatList
-              data={leaderboard.slice(2)} // start from 3rd rank
+              data={leaderboard.slice(2)}
               renderItem={renderLeaderboardItem}
               keyExtractor={(item) => item.wallet}
               showsVerticalScrollIndicator={false}
@@ -165,16 +176,42 @@ const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({ navigation }) => 
           </View>
         </View>
 
-        {/* Banner Ad at Bottom */}
-        <View style={{ position: 'absolute', bottom: 15, width: '100%', alignItems: 'center', zIndex: 5 }}>
-          <BannerAd
-            unitId={__DEV__ ? TestIds.BANNER : 'ca-app-pub-3644060799052014/8537781821'}
-            size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
-            requestOptions={{
-              requestNonPersonalizedAdsOnly: true,
+        {/* Banner Ad with Close Button */}
+        {showBanner && (
+          <View
+            style={{
+              position: 'absolute',
+              bottom: 15,
+              width: '100%',
+              alignItems: 'center',
+              zIndex: 10,
             }}
-          />
-        </View>
+          >
+            {/* Close Button */}
+            <TouchableOpacity
+              onPress={() => setShowBanner(false)}
+              style={{
+                position: 'absolute',
+                top: -30,
+                right: 10,
+                backgroundColor: 'rgba(0,0,0,0.6)',
+                padding: 4,
+                borderRadius: 12,
+                zIndex: 20,
+              }}
+            >
+              <Text style={{ color: 'white', fontSize: 14, fontWeight: 'bold' }}>✕</Text>
+            </TouchableOpacity>
+
+            <BannerAd
+              unitId={__DEV__ ? TestIds.BANNER : 'ca-app-pub-3644060799052014/8537781821'}
+              size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+              requestOptions={{
+                requestNonPersonalizedAdsOnly: true,
+              }}
+            />
+          </View>
+        )}
       </LinearGradient>
     </ImageBackground>
   );
@@ -212,7 +249,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-
   leaderboardTitle: {
     position: 'absolute',
     top: '44%',
@@ -224,7 +260,6 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 2, height: 2 },
     textShadowRadius: 4,
   },
-
   topTwoContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -266,11 +301,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 2,
   },
-
-  /* 🔹 Leaderboard List Section */
   listWrapper: {
     width: '75%',
-    height: 220, // shows ~4 items
+    height: 220,
     position: 'absolute',
     bottom: '14%',
     zIndex: 2,
@@ -278,8 +311,6 @@ const styles = StyleSheet.create({
   listContent: {
     paddingBottom: 20,
   },
-
-  /* 🔹 Each Row with Background Card */
   leaderboardItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -288,11 +319,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     marginBottom: 8,
     borderRadius: 10,
-    overflow: 'hidden', // ensures background fits rounded corners
+    overflow: 'hidden',
   },
   cardBackgroundImage: {
     borderRadius: 10,
-    opacity: 0.95, // slight transparency for visual depth
+    opacity: 0.95,
   },
   currentUserItem: {
     backgroundColor: 'rgba(0,255,255,0.1)',

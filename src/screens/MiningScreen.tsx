@@ -25,6 +25,7 @@ import {
   BannerAd,
   BannerAdSize,
 } from 'react-native-google-mobile-ads';
+import { useFocusEffect } from '@react-navigation/native';
 
 import notificationService from '../services/notificationService';
 
@@ -46,8 +47,20 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
   const [showMultiplierModal, setShowMultiplierModal] = useState(false);
   const [loadingAd, setLoadingAd] = useState(false);
   const [rewardedAd, setRewardedAd] = useState<RewardedAd | null>(null);
+
   const progressAnim = useRef(new Animated.Value(0)).current;
   const tokensAnim = useRef(new Animated.Value(1)).current;
+
+  // NEW — Banner visibility
+  const [showBanner, setShowBanner] = useState(true);
+
+  // Show banner again when returning to this screen
+  useFocusEffect(
+    React.useCallback(() => {
+      setShowBanner(true);
+      return () => {};
+    }, [])
+  );
 
   // Load Rewarded Ad
   const loadRewardedAd = (onRewardEarned: (reward: any) => void) => {
@@ -60,7 +73,9 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
 
     ad.addAdEventListener(RewardedAdEventType.LOADED, () => setRewardedAd(ad));
     ad.addAdEventListener(RewardedAdEventType.EARNED_REWARD, onRewardEarned);
-    ad.addAdEventListener(AdEventType.ERROR, e => console.log('[AdMob] Error:', e));
+    ad.addAdEventListener(AdEventType.ERROR, e =>
+      console.log('[AdMob] Error:', e)
+    );
     ad.load();
   };
 
@@ -68,7 +83,6 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
   useEffect(() => {
     initializeNotifications();
     return () => {
-      // Cleanup when component unmounts
       notificationService.cancelMiningNotifications();
     };
   }, []);
@@ -77,15 +91,14 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
     try {
       await notificationService.initialize();
       const hasPermission = await notificationService.requestPermissions();
-      
+
       if (!hasPermission) {
         showInfoToast('Please enable notifications to get mining alerts');
       }
 
-      // Setup notification handlers
-      const unsubscribe = await notificationService.setupNotificationHandlers(navigation);
-      
-      // Return cleanup function
+      const unsubscribe =
+        await notificationService.setupNotificationHandlers(navigation);
+
       return () => {
         if (unsubscribe) unsubscribe();
       };
@@ -95,7 +108,7 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
   };
 
   useEffect(() => loadRewardedAd(() => {}), []);
-  
+
   useEffect(() => {
     loadWalletAndProgress();
     const interval = setInterval(updateProgress, 1000);
@@ -110,41 +123,46 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
     }).start();
 
     Animated.sequence([
-      Animated.timing(tokensAnim, { toValue: 1.15, duration: 200, useNativeDriver: true }),
-      Animated.timing(tokensAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.timing(tokensAnim, {
+        toValue: 1.15,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(tokensAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
     ]).start();
 
-    // Schedule notification when mining starts or updates
     if (progress.timeRemaining > 0 && !progress.isComplete) {
       scheduleNotification(progress.timeRemaining, progress.currentPoints);
     }
 
     if (progress.isComplete) {
-      // Don't cancel notification - let it fire naturally
-      // This allows testing notifications even when app is open
       navigation.replace('Claim');
     }
   }, [progress]);
 
-  const scheduleNotification = async (timeRemaining: number, currentPoints: number) => {
+  const scheduleNotification = async (
+    timeRemaining: number,
+    currentPoints: number
+  ) => {
     try {
-      // Only schedule if we haven't scheduled yet (check if notification already exists)
-      const scheduledNotifs = await notificationService.getScheduledNotifications();
-      const existingNotif = scheduledNotifs.find(n => n.notification.id === 'mining-complete');
-      
-      // Only schedule if no notification exists yet
+      const scheduledNotifs =
+        await notificationService.getScheduledNotifications();
+      const existingNotif = scheduledNotifs.find(
+        n => n.notification.id === 'mining-complete'
+      );
+
       if (!existingNotif) {
-        // Calculate final tokens (approximate)
         const rate = miningRates?.[currentMultiplier]?.rate || 0;
-        const finalTokens = currentPoints + (timeRemaining * rate);
-        
+        const finalTokens = currentPoints + timeRemaining * rate;
+
         await notificationService.scheduleMiningCompleteNotification(
           timeRemaining,
           finalTokens
         );
-        console.log('[Notifications] ✅ Scheduled for', timeRemaining, 'seconds');
-      } else {
-        console.log('[Notifications] Already scheduled, skipping');
       }
     } catch (error) {
       console.error('[Notifications] Schedule error:', error);
@@ -192,21 +210,28 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
         return showInfoToast('You have reached the max multiplier (6×)');
 
       setLoadingAd(true);
-      rewardedAd.addAdEventListener(RewardedAdEventType.EARNED_REWARD, async () => {
-        await api.upgradeMultiplier(wallet, nextMultiplier);
-        setCurrentMultiplier(nextMultiplier);
-        if (miningRates)
-          showSuccessToast(
-            `Now earning ${miningRates[nextMultiplier].hourlyReward.toFixed(2)} tokens/hr!`,
-            `Upgraded to ${nextMultiplier}×`
-          );
-        await loadWalletAndProgress();
-        
-        // Reschedule notification with new rate
-        if (progress.timeRemaining > 0) {
-          scheduleNotification(progress.timeRemaining, progress.currentPoints);
+      rewardedAd.addAdEventListener(
+        RewardedAdEventType.EARNED_REWARD,
+        async () => {
+          await api.upgradeMultiplier(wallet, nextMultiplier);
+          setCurrentMultiplier(nextMultiplier);
+          if (miningRates)
+            showSuccessToast(
+              `Now earning ${miningRates[
+                nextMultiplier
+              ].hourlyReward.toFixed(2)} tokens/hr!`,
+              `Upgraded to ${nextMultiplier}×`
+            );
+          await loadWalletAndProgress();
+
+          if (progress.timeRemaining > 0) {
+            scheduleNotification(
+              progress.timeRemaining,
+              progress.currentPoints
+            );
+          }
         }
-      });
+      );
 
       rewardedAd.addAdEventListener(AdEventType.CLOSED, () => {
         setLoadingAd(false);
@@ -220,13 +245,13 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
     }
   };
 
-  const formatTime = (seconds: number) => {
+const formatTime = (seconds: number): string => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = seconds % 60;
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s
+    return `${h.toString().padStart(2, '0')}:${m
       .toString()
-      .padStart(2, '0')}`;
+      .padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
   if (configLoading || !miningRates)
@@ -332,7 +357,9 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
 
           {/* Tokens */}
           <View style={{ alignItems: 'center', marginTop: 10 }}>
-            <Text style={{ color: '#FFD700', fontSize: 16 }}>🪙 TOKENS MINED</Text>
+            <Text style={{ color: '#FFD700', fontSize: 16 }}>
+              🪙 TOKENS MINED
+            </Text>
             <Animated.Text
               style={{
                 color: '#fff',
@@ -347,16 +374,47 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
           </View>
         </ImageBackground>
 
-        {/* Banner Ad */}
-        <View style={{ alignItems: 'center', marginBottom: 20 }}>
-          <BannerAd
-            unitId={__DEV__ ? TestIds.BANNER : 'ca-app-pub-3644060799052014/8537781821'}
-            size={BannerAdSize.LARGE_BANNER}
-            requestOptions={{
-              requestNonPersonalizedAdsOnly: true,
-            }}
-          />
-        </View>
+        {/* Banner Ad with Close Button */}
+        {showBanner && (
+          <View style={{ alignItems: 'center', marginBottom: 20 }}>
+            {/* Close button */}
+            <TouchableOpacity
+              onPress={() => setShowBanner(false)}
+              style={{
+                position: 'absolute',
+                top: -10,
+                right: -25,
+                zIndex: 50,
+                backgroundColor: 'rgba(0,0,0,0.6)',
+                padding: 4,
+                borderRadius: 12,
+              }}
+            >
+              <Text
+                style={{
+                  color: 'white',
+                  fontSize: 14,
+                  fontWeight: 'bold',
+                }}
+              >
+                ✕
+              </Text>
+            </TouchableOpacity>
+
+            {/* Banner */}
+            <BannerAd
+              unitId={
+                __DEV__
+                  ? TestIds.BANNER
+                  : 'ca-app-pub-3644060799052014/8537781821'
+              }
+              size={BannerAdSize.LARGE_BANNER}
+              requestOptions={{
+                requestNonPersonalizedAdsOnly: true,
+              }}
+            />
+          </View>
+        )}
 
         {/* Balance Section */}
         <ImageBackground
@@ -379,22 +437,48 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
             }}
           >
             <TouchableOpacity onPress={handleUpgradeMultiplier}>
-              <Text style={{ color: '#00FFFF', fontSize: 14, fontWeight: 'bold' }}>
+              <Text
+                style={{
+                  color: '#00FFFF',
+                  fontSize: 14,
+                  fontWeight: 'bold',
+                }}
+              >
                 MULTIPLIER
               </Text>
-              <Text style={{ color: '#fff', fontSize: 20, fontWeight: 'bold' }}>
+              <Text
+                style={{
+                  color: '#fff',
+                  fontSize: 20,
+                  fontWeight: 'bold',
+                }}
+              >
                 {currentMultiplier}×
               </Text>
               {canUpgrade && (
-                <Text style={{ color: '#999', fontSize: 11 }}>Tap to upgrade</Text>
+                <Text style={{ color: '#999', fontSize: 11 }}>
+                  Tap to upgrade
+                </Text>
               )}
             </TouchableOpacity>
 
             <View>
-              <Text style={{ color: '#00FFFF', fontSize: 14, fontWeight: 'bold' }}>
+              <Text
+                style={{
+                  color: '#00FFFF',
+                  fontSize: 14,
+                  fontWeight: 'bold',
+                }}
+              >
                 RATE
               </Text>
-              <Text style={{ color: '#fff', fontSize: 20, fontWeight: 'bold' }}>
+              <Text
+                style={{
+                  color: '#fff',
+                  fontSize: 20,
+                  fontWeight: 'bold',
+                }}
+              >
                 {miningRates[currentMultiplier].rate.toFixed(4)}/sec
               </Text>
             </View>
@@ -424,8 +508,6 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
             🏠 BACK TO HOME
           </Text>
         </TouchableOpacity>
-
-
       </ScrollView>
 
       {/* Modals (Unchanged) */}
@@ -433,27 +515,42 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Upgrade Multiplier</Text>
-            <Text style={styles.modalSubtitle}>Watch an ad to increase your rate</Text>
+            <Text style={styles.modalSubtitle}>
+              Watch an ad to increase your rate
+            </Text>
             <View style={styles.currentMultiplierInfo}>
-              <Text style={styles.infoLabel}>Current: {currentMultiplier}×</Text>
+              <Text style={styles.infoLabel}>
+                Current: {currentMultiplier}×
+              </Text>
               <Text style={styles.infoValue}>
-                {miningRates[currentMultiplier].hourlyReward.toFixed(2)} tokens/hr
+                {miningRates[currentMultiplier].hourlyReward.toFixed(2)}{' '}
+                tokens/hr
               </Text>
             </View>
+
             {currentMultiplier < 6 ? (
-              <TouchableOpacity style={styles.multiplierOption} onPress={watchAdAndUpgrade}>
+              <TouchableOpacity
+                style={styles.multiplierOption}
+                onPress={watchAdAndUpgrade}
+              >
                 <Text style={styles.multiplierOptionTitle}>
                   {currentMultiplier + 1}× Multiplier
                 </Text>
                 <Text style={styles.multiplierOptionRate}>
-                  {miningRates[currentMultiplier + 1].hourlyReward.toFixed(2)} tokens/hr
+                  {miningRates[
+                    currentMultiplier + 1
+                  ].hourlyReward.toFixed(2)}{' '}
+                  tokens/hr
                 </Text>
               </TouchableOpacity>
             ) : (
               <View style={styles.maxMultiplierMessage}>
-                <Text style={styles.maxMultiplierText}>🎉 Max Multiplier Reached</Text>
+                <Text style={styles.maxMultiplierText}>
+                  🎉 Max Multiplier Reached
+                </Text>
               </View>
             )}
+
             <TouchableOpacity
               style={styles.modalCloseButton}
               onPress={() => setShowMultiplierModal(false)}

@@ -46,6 +46,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   // Pulse animation for buttons
   const [adsPulseAnim] = useState(new Animated.Value(1));
 
+  // NEW — Banner visibility state
+  const [showBanner, setShowBanner] = useState(true);
+
   const walletAnimRef = useRef<LottieView>(null);
 
   useEffect(() => {
@@ -55,6 +58,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   useFocusEffect(
     React.useCallback(() => {
       loadUserData();
+
+      // NEW — show banner again every time user returns to this screen
+      setShowBanner(true);
+
       return undefined;
     }, [])
   );
@@ -222,16 +229,35 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </View>
       </View>
 
-      {/* Banner Ad */}
-      <View style={{ alignItems: 'center', marginVertical: 2 }}>
-        <BannerAd
-          unitId={__DEV__ ? TestIds.BANNER : 'ca-app-pub-3644060799052014/8537781821'}
-          size={BannerAdSize.LARGE_BANNER}
-          requestOptions={{
-            requestNonPersonalizedAdsOnly: true,
-          }}
-        />
-      </View>
+      {/* Banner Ad with Close Button */}
+      {showBanner && (
+        <View style={{ alignItems: 'center', marginVertical: 2 }}>
+
+          {/* Close Button */}
+          <TouchableOpacity
+            onPress={() => setShowBanner(false)}
+            style={{
+              position: 'absolute',
+              top: -10,
+              right: 10,
+              zIndex: 50,
+              backgroundColor: 'rgba(0,0,0,0.6)',
+              padding: 4,
+              borderRadius: 12,
+            }}
+          >
+            <Text style={{ color: 'white', fontSize: 14, fontWeight: 'bold' }}>✕</Text>
+          </TouchableOpacity>
+
+          <BannerAd
+            unitId={__DEV__ ? TestIds.BANNER : 'ca-app-pub-3644060799052014/8537781821'}
+            size={BannerAdSize.LARGE_BANNER}
+            requestOptions={{
+              requestNonPersonalizedAdsOnly: true,
+            }}
+          />
+        </View>
+      )}
 
       {/* ACTION BUTTONS */}
       <View style={localStyles.actionButtonsContainer}>
@@ -421,10 +447,9 @@ const localStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 5,
-    gap: 25, // <-- Extra spacing between buttons
+    gap: 25,
   },
 
-  /* LEADERBOARD BUTTON */
   leaderboardWrapper: {
     justifyContent: 'center',
     alignItems: 'center',
@@ -441,7 +466,6 @@ const localStyles = StyleSheet.create({
     resizeMode: 'contain',
   },
 
-  /* ADS BUTTON */
   adsWrapper: {
     justifyContent: 'center',
     alignItems: 'center',
@@ -458,7 +482,6 @@ const localStyles = StyleSheet.create({
     resizeMode: 'contain',
   },
 
-  /* Mining Buttons */
   mineNowContainer: {
     position: 'absolute',
     bottom: 80,
@@ -471,7 +494,6 @@ const localStyles = StyleSheet.create({
     resizeMode: 'contain',
   },
 
-  /* Claim Reward */
   claimRewardButton: {
     position: 'absolute',
     bottom: 140,
