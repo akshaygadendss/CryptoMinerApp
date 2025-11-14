@@ -7,6 +7,12 @@ const minerUserSchema = new mongoose.Schema({
     unique: true,
     trim: true
   },
+  referralCode: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true
+  },
   createdAt: {
     type: Date,
     default: Date.now,

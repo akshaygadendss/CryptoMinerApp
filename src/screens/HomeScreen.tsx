@@ -16,17 +16,11 @@ import {
   Easing,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import LottieView from 'lottie-react-native';
 import { COLORS } from '../constants/mining';
 import api, { User, UserSummary } from '../services/api';
 import { useConfig } from '../hooks/useConfig';
 import { styles as baseStyles } from './HomeScreen.styles';
 import { showSuccessToast, showErrorToast, showInfoToast } from '../utils/toast';
-import {
-  BannerAd,
-  BannerAdSize,
-  TestIds,
-} from 'react-native-google-mobile-ads';
 
 interface HomeScreenProps {
   navigation: any;
@@ -46,11 +40,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   // Pulse animation for buttons
   const [adsPulseAnim] = useState(new Animated.Value(1));
 
-  // NEW — Banner visibility state
-  const [showBanner, setShowBanner] = useState(true);
-
-  const walletAnimRef = useRef<LottieView>(null);
-
   useEffect(() => {
     loadUserData();
   }, []);
@@ -58,10 +47,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   useFocusEffect(
     React.useCallback(() => {
       loadUserData();
-
-      // NEW — show banner again every time user returns to this screen
-      setShowBanner(true);
-
       return undefined;
     }, [])
   );
@@ -210,13 +195,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </View>
       </View>
 
-      {/* Logout */}
-      <TouchableOpacity style={localStyles.logoutButton} onPress={handleLogout}>
-        <Text style={localStyles.logoutText}>LOGOUT</Text>
-      </TouchableOpacity>
-
-      {/* Dashboard Title */}
-      <Text style={localStyles.dashboardTitle}>Dashboard</Text>
+      {/* Top Right Icons */}
+      <View style={localStyles.topRightIcons}>
+        <TouchableOpacity style={localStyles.iconButton} onPress={() => navigation.navigate('Notifications')}>
+          <Text style={localStyles.iconText}>🔔</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={localStyles.iconButton} onPress={handleLogout}>
+          <Text style={localStyles.iconText}>🚪</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Balance */}
       <View style={localStyles.balanceContainer}>
@@ -227,69 +214,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             {totalBalance.toFixed(4)} TOKENS
           </Animated.Text>
         </View>
-      </View>
-
-      {/* Banner Ad with Close Button */}
-      {showBanner && (
-        <View style={{ alignItems: 'center', marginVertical: 2 }}>
-
-          {/* Close Button */}
-          <TouchableOpacity
-            onPress={() => setShowBanner(false)}
-            style={{
-              position: 'absolute',
-              top: -10,
-              right: 10,
-              zIndex: 50,
-              backgroundColor: 'rgba(0,0,0,0.6)',
-              padding: 4,
-              borderRadius: 12,
-            }}
-          >
-            <Text style={{ color: 'white', fontSize: 14, fontWeight: 'bold' }}>✕</Text>
-          </TouchableOpacity>
-
-          <BannerAd
-            unitId={__DEV__ ? TestIds.BANNER : 'ca-app-pub-3644060799052014/8537781821'}
-            size={BannerAdSize.LARGE_BANNER}
-            requestOptions={{
-              requestNonPersonalizedAdsOnly: true,
-            }}
-          />
-        </View>
-      )}
-
-      {/* ACTION BUTTONS */}
-      <View style={localStyles.actionButtonsContainer}>
-
-        {/* Leaderboard Button */}
-        <Animated.View style={[localStyles.leaderboardWrapper, { transform: [{ scale: adsPulseAnim }] }]}>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Leaderboard')}
-            activeOpacity={0.75}
-            style={localStyles.leaderboardContainer}
-          >
-            <Image
-              source={require('../../assets/images/homescreen/leaderboard_button.png')}
-              style={localStyles.leaderboardImage}
-            />
-          </TouchableOpacity>
-        </Animated.View>
-
-        {/* Watch Ads Button */}
-        <Animated.View style={[localStyles.adsWrapper, { transform: [{ scale: adsPulseAnim }] }]}>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('WatchAds')}
-            activeOpacity={0.75}
-            style={localStyles.adsContainer}
-          >
-            <Image
-              source={require('../../assets/images/homescreen/ad_button.png')}
-              style={localStyles.adsImage}
-            />
-          </TouchableOpacity>
-        </Animated.View>
-
       </View>
 
       {/* Mine or Claim */}
@@ -347,6 +271,36 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </View>
       </Modal>
 
+      {/* Bottom Tabs */}
+      <View style={localStyles.bottomTabs}>
+        <TouchableOpacity
+          style={localStyles.tabButton}
+          onPress={() => navigation.navigate('Leaderboard')}
+          activeOpacity={0.7}
+        >
+          <Text style={localStyles.tabIcon}>🏆</Text>
+          <Text style={localStyles.tabLabel}>Leaderboard</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={localStyles.tabButton}
+          onPress={() => navigation.navigate('Referral')}
+          activeOpacity={0.7}
+        >
+          <Text style={localStyles.tabIcon}>🎁</Text>
+          <Text style={localStyles.tabLabel}>Referral</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={localStyles.tabButton}
+          onPress={() => navigation.navigate('WatchAds')}
+          activeOpacity={0.7}
+        >
+          <Text style={localStyles.tabIcon}>📺</Text>
+          <Text style={localStyles.tabLabel}>Watch Ads</Text>
+        </TouchableOpacity>
+      </View>
+
     </ImageBackground>
   );
 };
@@ -394,24 +348,28 @@ const localStyles = StyleSheet.create({
     fontSize: 15,
   },
 
-  logoutButton: {
+  topRightIcons: {
     position: 'absolute',
     top: 40,
     right: 20,
+    flexDirection: 'row',
+    gap: 10,
+    zIndex: 11,
+  },
+  iconButton: {
     backgroundColor: 'rgba(0,0,0,0.4)',
     borderWidth: 1,
     borderColor: '#00FFFF',
     borderRadius: 15,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    width: 56,
     height: 56,
-    width: 120,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 11,
   },
 
-  logoutText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  iconText: {
+    fontSize: 24,
+  },
 
   dashboardTitle: {
     position: 'absolute',
@@ -484,7 +442,7 @@ const localStyles = StyleSheet.create({
 
   mineNowContainer: {
     position: 'absolute',
-    bottom: 80,
+    bottom: 180,
     alignSelf: 'center',
   },
 
@@ -496,7 +454,7 @@ const localStyles = StyleSheet.create({
 
   claimRewardButton: {
     position: 'absolute',
-    bottom: 140,
+    bottom: 200,
     alignSelf: 'center',
   },
 
@@ -512,6 +470,37 @@ const localStyles = StyleSheet.create({
     color: '#000',
     fontSize: 22,
     fontWeight: 'bold',
+  },
+
+  bottomTabs: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    borderTopWidth: 2,
+    borderTopColor: '#00FFFF',
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  tabButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+  },
+  tabIcon: {
+    fontSize: 28,
+    marginBottom: 4,
+  },
+  tabLabel: {
+    fontSize: 11,
+    color: '#00FFFF',
+    fontWeight: '600',
   },
 
 });

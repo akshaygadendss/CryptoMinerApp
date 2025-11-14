@@ -3,6 +3,17 @@ import User from '../models/User.js';
 import MinerUser from '../models/MinerUser.js';
 import Config from '../models/Config.js';
 import AdReward from '../models/AdReward.js';
+import Referral from '../models/Referral.js';
+
+// Helper function to generate unique 6-character referral code
+const generateReferralCode = () => {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += characters.charAt(Math.floor(Math.random() * characters.length));
+  }
+  return code;
+};
 
 const router = express.Router();
 
@@ -34,11 +45,23 @@ router.post('/signup', async (req, res) => {
     await user.save();
     console.log('[SIGNUP] User created successfully:', user._id);
 
-    // Create MinerUser entry
+    // Create MinerUser entry with unique referral code
     console.log('[SIGNUP] Creating MinerUser entry...');
-    minerUser = new MinerUser({ walletId: wallet.trim() });
+    let referralCode = generateReferralCode();
+    
+    // Ensure referral code is unique
+    let existingCode = await MinerUser.findOne({ referralCode });
+    while (existingCode) {
+      referralCode = generateReferralCode();
+      existingCode = await MinerUser.findOne({ referralCode });
+    }
+    
+    minerUser = new MinerUser({ 
+      walletId: wallet.trim(),
+      referralCode: referralCode
+    });
     await minerUser.save();
-    console.log('[SIGNUP] MinerUser created successfully:', minerUser._id);
+    console.log('[SIGNUP] MinerUser created successfully with referral code:', referralCode);
 
     res.status(201).json({ 
       message: 'User created successfully', 
@@ -632,6 +655,129 @@ router.get('/ad-rewards/:wallet', async (req, res) => {
     });
   } catch (error) {
     console.error('[GET-AD-REWARDS] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Apply referral code
+router.post('/apply-referral', async (req, res) => {
+  try {
+    const { referredWallet, referralCode } = req.body;
+    console.log('[APPLY-REFERRAL] Request:', { referredWallet, referralCode });
+
+    if (!referredWallet || !referralCode) {
+      return res.status(400).json({ error: 'Referred wallet and referral code are required' });
+    }
+
+    // Check if referred user already used a referral code
+    const existingReferral = await Referral.findOne({ referredWallet });
+    if (existingReferral) {
+      return res.status(400).json({ error: 'You have already used a referral code' });
+    }
+
+    // Find referrer by referral code
+    const referrer = await MinerUser.findOne({ referralCode: referralCode.toUpperCase() });
+    if (!referrer) {
+      return res.status(404).json({ error: 'Invalid referral code' });
+    }
+
+    // Check if user is trying to refer themselves
+    if (referredWallet === referrer.walletId) {
+      return res.status(400).json({ error: 'You cannot use your own referral code' });
+    }
+
+    // Check if referred user exists
+    const referredUser = await MinerUser.findOne({ walletId: referredWallet });
+    if (!referredUser) {
+      return res.status(404).json({ error: 'User not registered' });
+    }
+
+    // Create referral record
+    const referral = new Referral({
+      referrerWallet: referrer.walletId,
+      referredWallet: referredWallet,
+      rewardTokens: 200,
+      claimedAt: new Date()
+    });
+
+    await referral.save();
+
+    // Create ad reward for the referrer (200 tokens)
+    const adReward = new AdReward({
+      wallet: referrer.walletId,
+      rewardedTokens: 200,
+      claimedAt: new Date()
+    });
+
+    await adReward.save();
+
+    console.log('[APPLY-REFERRAL] Referral applied successfully');
+
+    res.status(200).json({
+      message: 'Referral code applied successfully! 200 tokens added to referrer.',
+      referral,
+      referrerWallet: referrer.walletId,
+      rewardedTokens: 200
+    });
+  } catch (error) {
+    console.error('[APPLY-REFERRAL] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Check if user has used a referral code
+router.get('/check-referral/:wallet', async (req, res) => {
+  try {
+    const { wallet } = req.params;
+    console.log('[CHECK-REFERRAL] Checking for wallet:', wallet);
+
+    const referral = await Referral.findOne({ referredWallet: wallet });
+
+    res.status(200).json({
+      hasUsedReferral: !!referral,
+      referral: referral || null
+    });
+  } catch (error) {
+    console.error('[CHECK-REFERRAL] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get user's referral code
+router.get('/referral-code/:wallet', async (req, res) => {
+  try {
+    const { wallet } = req.params;
+    console.log('[GET-REFERRAL-CODE] Fetching for wallet:', wallet);
+
+    const minerUser = await MinerUser.findOne({ walletId: wallet });
+    if (!minerUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.status(200).json({
+      wallet: minerUser.walletId,
+      referralCode: minerUser.referralCode
+    });
+  } catch (error) {
+    console.error('[GET-REFERRAL-CODE] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get referral notifications (where user is the referrer)
+router.get('/referral-notifications/:wallet', async (req, res) => {
+  try {
+    const { wallet } = req.params;
+    console.log('[GET-REFERRAL-NOTIFICATIONS] Fetching for wallet:', wallet);
+
+    const referrals = await Referral.find({ referrerWallet: wallet }).sort({ claimedAt: -1 });
+
+    res.status(200).json({
+      notifications: referrals,
+      count: referrals.length
+    });
+  } catch (error) {
+    console.error('[GET-REFERRAL-NOTIFICATIONS] Error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });

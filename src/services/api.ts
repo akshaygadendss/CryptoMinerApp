@@ -270,6 +270,77 @@ class API {
       throw error;
     }
   }
+
+  async applyReferralCode(referredWallet: string, referralCode: string): Promise<any> {
+    try {
+      console.log('[API] ApplyReferralCode request:', { referredWallet, referralCode, url: `${API_URL}/apply-referral` });
+      const response = await axios.post(`${API_URL}/apply-referral`, {
+        referredWallet,
+        referralCode
+      });
+      console.log('[API] ApplyReferralCode response:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('[API] ApplyReferralCode error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        url: error.config?.url
+      });
+      throw error;
+    }
+  }
+
+  async checkReferral(wallet: string): Promise<{ hasUsedReferral: boolean; referral: any }> {
+    try {
+      console.log('[API] CheckReferral request:', { wallet, url: `${API_URL}/check-referral/${wallet}` });
+      const response = await axios.get(`${API_URL}/check-referral/${wallet}`);
+      console.log('[API] CheckReferral response:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('[API] CheckReferral error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        url: error.config?.url
+      });
+      throw error;
+    }
+  }
+
+  async getReferralCode(wallet: string): Promise<{ wallet: string; referralCode: string }> {
+    try {
+      console.log('[API] GetReferralCode request:', { wallet, url: `${API_URL}/referral-code/${wallet}` });
+      const response = await axios.get(`${API_URL}/referral-code/${wallet}`);
+      console.log('[API] GetReferralCode response:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('[API] GetReferralCode error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        url: error.config?.url
+      });
+      throw error;
+    }
+  }
+
+  async getReferralNotifications(wallet: string): Promise<{ notifications: any[]; count: number }> {
+    try {
+      console.log('[API] GetReferralNotifications request:', { wallet, url: `${API_URL}/referral-notifications/${wallet}` });
+      const response = await axios.get(`${API_URL}/referral-notifications/${wallet}`);
+      console.log('[API] GetReferralNotifications response:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('[API] GetReferralNotifications error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        url: error.config?.url
+      });
+      throw error;
+    }
+  }
 }
 
 export default new API();

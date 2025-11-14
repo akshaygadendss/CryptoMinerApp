@@ -10,6 +10,8 @@ import MiningScreen from './src/screens/MiningScreen';
 import ClaimScreen from './src/screens/ClaimScreen';
 import LeaderboardScreen from './src/screens/LeaderboardScreen';
 import WatchAdsScreen from './src/screens/WatchAdsScreen';
+import ReferralScreen from './src/screens/ReferralScreen';
+import NotificationsScreen from './src/screens/NotificationsScreen';
  
 const Stack = createNativeStackNavigator();
  
@@ -64,6 +66,8 @@ function App(): React.JSX.Element {
           <Stack.Screen name="Claim" component={ClaimScreen} />
           <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
           <Stack.Screen name="WatchAds" component={WatchAdsScreen} />
+          <Stack.Screen name="Referral" component={ReferralScreen} />
+          <Stack.Screen name="Notifications" component={NotificationsScreen} />
         </Stack.Navigator>
       </NavigationContainer>
       <Toast />
