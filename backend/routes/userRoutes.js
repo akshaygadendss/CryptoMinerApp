@@ -4,6 +4,7 @@ import MinerUser from '../models/MinerUser.js';
 import Config from '../models/Config.js';
 import AdReward from '../models/AdReward.js';
 import Referral from '../models/Referral.js';
+import ReferralMiningReward from '../models/ReferralMiningReward.js';
 
 const router = express.Router();
 
@@ -276,12 +277,46 @@ router.post('/claim-reward', async (req, res) => {
       return res.status(400).json({ error: 'No rewards to claim' });
     }
 
-    user.totalEarned += user.currentMiningPoints;
+    const claimedTokens = user.currentMiningPoints;
+    user.totalEarned += claimedTokens;
     user.currentMiningPoints = 0;
     user.status = 'claimed';
     user.lastUpdated = new Date();
 
     await user.save();
+
+    // Check if this user was referred by someone
+    const referral = await Referral.findOne({ referredWallet: wallet });
+    
+    if (referral) {
+      // Calculate 10% of the claimed tokens for the referrer
+      const referrerReward = claimedTokens * 0.1;
+      
+      // Create a referral mining reward record
+      const miningReward = new ReferralMiningReward({
+        referrerWallet: referral.referrerWallet,
+        referredWallet: wallet,
+        session10percentTokens: referrerReward,
+        claimedAt: new Date()
+      });
+      
+      await miningReward.save();
+      
+      // Add the 10% reward to the referrer's balance via AdReward collection
+      const adReward = new AdReward({
+        wallet: referral.referrerWallet,
+        rewardedTokens: referrerReward,
+        claimedAt: new Date()
+      });
+      
+      await adReward.save();
+      
+      console.log('[CLAIM-REWARD] Referrer reward added:', {
+        referrer: referral.referrerWallet,
+        referred: wallet,
+        reward: referrerReward
+      });
+    }
 
     res.status(200).json({ 
       message: 'Reward claimed successfully', 
@@ -737,6 +772,27 @@ router.get('/referral-notifications/:wallet', async (req, res) => {
     });
   } catch (error) {
     console.error('[GET-REFERRAL-NOTIFICATIONS] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get referral mining rewards (10% from referred users' mining)
+router.get('/referral-mining-rewards/:wallet', async (req, res) => {
+  try {
+    const { wallet } = req.params;
+    console.log('[GET-REFERRAL-MINING-REWARDS] Fetching for wallet:', wallet);
+
+    const miningRewards = await ReferralMiningReward.find({ referrerWallet: wallet }).sort({ claimedAt: -1 });
+    
+    const totalMiningRewards = miningRewards.reduce((sum, reward) => sum + reward.session10percentTokens, 0);
+
+    res.status(200).json({
+      miningRewards,
+      totalMiningRewards,
+      count: miningRewards.length
+    });
+  } catch (error) {
+    console.error('[GET-REFERRAL-MINING-REWARDS] Error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });

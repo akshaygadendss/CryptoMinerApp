@@ -28,12 +28,25 @@ interface ReferralNotification {
   referredWallet: string;
   rewardTokens: number;
   claimedAt: string;
+  type: 'signup';
 }
 
+interface MiningRewardNotification {
+  _id: string;
+  referrerWallet: string;
+  referredWallet: string;
+  session10percentTokens: number;
+  claimedAt: string;
+  type: 'mining';
+}
+
+type CombinedNotification = ReferralNotification | MiningRewardNotification;
+
 const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation }) => {
-  const [notifications, setNotifications] = useState<ReferralNotification[]>([]);
+  const [notifications, setNotifications] = useState<CombinedNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [wallet, setWallet] = useState<string>('');
+  const [totalReferralRewards, setTotalReferralRewards] = useState<number>(0);
 
   useEffect(() => {
     loadNotifications();
@@ -44,8 +57,33 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation })
       const storedWallet = await api.getStoredWallet();
       if (storedWallet) {
         setWallet(storedWallet);
-        const data = await api.getReferralNotifications(storedWallet);
-        setNotifications(data.notifications);
+        
+        // Fetch both types of notifications
+        const referralData = await api.getReferralNotifications(storedWallet);
+        const miningData = await api.getReferralMiningRewards(storedWallet);
+        
+        // Mark each notification with its type
+        const signupNotifications: ReferralNotification[] = referralData.notifications.map(n => ({
+          ...n,
+          type: 'signup' as const
+        }));
+        
+        const miningNotifications: MiningRewardNotification[] = miningData.miningRewards.map(n => ({
+          ...n,
+          type: 'mining' as const
+        }));
+        
+        // Combine and sort by date
+        const combined = [...signupNotifications, ...miningNotifications].sort((a, b) => 
+          new Date(b.claimedAt).getTime() - new Date(a.claimedAt).getTime()
+        );
+        
+        setNotifications(combined);
+        
+        // Calculate total rewards
+        const signupTotal = referralData.notifications.reduce((sum, n) => sum + n.rewardTokens, 0);
+        const miningTotal = miningData.totalMiningRewards;
+        setTotalReferralRewards(signupTotal + miningTotal);
       } else {
         navigation.replace('Signup');
       }
@@ -57,26 +95,46 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation })
     }
   };
 
-  const renderNotification = ({ item }: { item: ReferralNotification }) => {
+  const renderNotification = ({ item }: { item: CombinedNotification }) => {
     const date = new Date(item.claimedAt).toLocaleDateString();
     const time = new Date(item.claimedAt).toLocaleTimeString();
 
-    return (
-      <View style={styles.notificationCard}>
-        <View style={styles.iconContainer}>
-          <Text style={styles.icon}>🎁</Text>
+    if (item.type === 'signup') {
+      return (
+        <View style={styles.notificationCard}>
+          <View style={styles.iconContainer}>
+            <Text style={styles.icon}>🎁</Text>
+          </View>
+          <View style={styles.contentContainer}>
+            <Text style={styles.title}>Referral Signup Reward!</Text>
+            <Text style={styles.message}>
+              <Text style={styles.highlight}>{item.referredWallet.slice(0, 8)}...</Text>
+              {' '}used your referral code
+            </Text>
+            <Text style={styles.reward}>+{item.rewardTokens} TOKENS</Text>
+            <Text style={styles.timestamp}>{date} at {time}</Text>
+          </View>
         </View>
-        <View style={styles.contentContainer}>
-          <Text style={styles.title}>Referral Reward Earned!</Text>
-          <Text style={styles.message}>
-            <Text style={styles.highlight}>{item.referredWallet.slice(0, 8)}...</Text>
-            {' '}used your referral code
-          </Text>
-          <Text style={styles.reward}>+{item.rewardTokens} TOKENS</Text>
-          <Text style={styles.timestamp}>{date} at {time}</Text>
+      );
+    } else {
+      // Mining reward notification
+      return (
+        <View style={styles.notificationCard}>
+          <View style={[styles.iconContainer, styles.miningIconContainer]}>
+            <Text style={styles.icon}>⛏️</Text>
+          </View>
+          <View style={styles.contentContainer}>
+            <Text style={styles.title}>Mining Referral Reward!</Text>
+            <Text style={styles.message}>
+              <Text style={styles.highlight}>{item.referredWallet.slice(0, 8)}...</Text>
+              {' '}completed a mining session
+            </Text>
+            <Text style={styles.reward}>+{item.session10percentTokens.toFixed(4)} TOKENS (10%)</Text>
+            <Text style={styles.timestamp}>{date} at {time}</Text>
+          </View>
         </View>
-      </View>
-    );
+      );
+    }
   };
 
   if (loading) {
@@ -115,7 +173,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation })
         {notifications.length > 0 && (
           <View style={styles.totalRewardsSimpleCard}>
             <Text style={styles.totalRewardsSimpleText}>
-              Total Referral Rewards: {notifications.length * 200} Tokens
+              Total Referral Rewards: {totalReferralRewards.toFixed(4)} Tokens
             </Text>
           </View>
         )}
@@ -233,6 +291,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+  },
+  miningIconContainer: {
+    backgroundColor: 'rgba(255,215,0,0.2)',
   },
   icon: {
     fontSize: 24,

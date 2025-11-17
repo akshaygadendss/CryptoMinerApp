@@ -1,7 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = 'http://192.168.1.47:3000/api';
+const API_URL = 'http://192.168.1.42:3000/api';
 //const API_URL = 'http://10.97.121.196:3000/api';
 
 export interface User {
@@ -316,6 +316,23 @@ class API {
       return response.data;
     } catch (error: any) {
       console.error('[API] GetReferralNotifications error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        url: error.config?.url
+      });
+      throw error;
+    }
+  }
+
+  async getReferralMiningRewards(wallet: string): Promise<{ miningRewards: any[]; totalMiningRewards: number; count: number }> {
+    try {
+      console.log('[API] GetReferralMiningRewards request:', { wallet, url: `${API_URL}/referral-mining-rewards/${wallet}` });
+      const response = await axios.get(`${API_URL}/referral-mining-rewards/${wallet}`);
+      console.log('[API] GetReferralMiningRewards response:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('[API] GetReferralMiningRewards error:', {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status,
