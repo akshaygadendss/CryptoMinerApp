@@ -217,6 +217,17 @@ router.post('/calculate-progress', async (req, res) => {
       });
     }
 
+    // Fetch mining rates from config
+    const miningRatesConfig = await Config.findOne({ key: 'MINING_RATES' });
+    const miningRates = miningRatesConfig ? miningRatesConfig.value : {
+      1: { rate: 0.0100, hourlyReward: 36.00 },
+      2: { rate: 0.0200, hourlyReward: 72.00 },
+      3: { rate: 0.0300, hourlyReward: 108.00 },
+      4: { rate: 0.0400, hourlyReward: 144.00 },
+      5: { rate: 0.0500, hourlyReward: 180.00 },
+      6: { rate: 0.0600, hourlyReward: 216.00 },
+    };
+
     const startTime = new Date(user.miningStartTime);
     const multiplierStartTime = new Date(user.currentMultiplierStartTime);
     const now = new Date();
@@ -225,10 +236,16 @@ router.post('/calculate-progress', async (req, res) => {
     const totalElapsedSeconds = Math.floor((now - startTime) / 1000);
     const totalSeconds = user.selectedHour * 3600;
     
+    // Get tokens per second from config
+    const tokensPerSecond = miningRates[user.multiplier]?.rate || (user.multiplier * 0.01);
+    
     // Calculate points earned with current multiplier
+    // IMPORTANT: Cap the multiplier elapsed time to not exceed total mining duration
     const multiplierElapsedSeconds = Math.floor((now - multiplierStartTime) / 1000);
-    const tokensPerSecond = user.multiplier * 0.01;
-    const newPoints = multiplierElapsedSeconds * tokensPerSecond;
+    const remainingSecondsFromMultiplierStart = totalSeconds - Math.floor((multiplierStartTime - startTime) / 1000);
+    const cappedMultiplierElapsedSeconds = Math.min(multiplierElapsedSeconds, remainingSecondsFromMultiplierStart);
+    
+    const newPoints = cappedMultiplierElapsedSeconds * tokensPerSecond;
     
     // Total points = previously earned + new points with current multiplier
     let currentPoints = user.currentMiningPoints + newPoints;
@@ -236,6 +253,7 @@ router.post('/calculate-progress', async (req, res) => {
     let progress = Math.min(100, (totalElapsedSeconds / totalSeconds) * 100);
 
     if (totalElapsedSeconds >= totalSeconds) {
+      // Mining complete - save final points and change status
       user.currentMiningPoints = currentPoints;
       user.status = 'ready_to_claim';
       user.lastUpdated = new Date();
@@ -390,11 +408,32 @@ router.post('/upgrade-multiplier', async (req, res) => {
 
     // If user is currently mining, recalculate points with old multiplier
     if (user.status === 'mining') {
+      // Fetch mining rates from config
+      const miningRatesConfig = await Config.findOne({ key: 'MINING_RATES' });
+      const miningRates = miningRatesConfig ? miningRatesConfig.value : {
+        1: { rate: 0.0100, hourlyReward: 36.00 },
+        2: { rate: 0.0200, hourlyReward: 72.00 },
+        3: { rate: 0.0300, hourlyReward: 108.00 },
+        4: { rate: 0.0400, hourlyReward: 144.00 },
+        5: { rate: 0.0500, hourlyReward: 180.00 },
+        6: { rate: 0.0600, hourlyReward: 216.00 },
+      };
+
       const now = new Date();
+      const startTime = new Date(user.miningStartTime);
       const multiplierStartTime = new Date(user.currentMultiplierStartTime);
+      const totalSeconds = user.selectedHour * 3600;
+      
+      // Calculate elapsed time with current multiplier
       const elapsedSeconds = Math.floor((now - multiplierStartTime) / 1000);
-      const tokensPerSecond = currentMultiplier * 0.01;
-      const pointsEarned = elapsedSeconds * tokensPerSecond;
+      
+      // Cap elapsed time to not exceed total mining duration
+      const remainingSecondsFromMultiplierStart = totalSeconds - Math.floor((multiplierStartTime - startTime) / 1000);
+      const cappedElapsedSeconds = Math.min(elapsedSeconds, remainingSecondsFromMultiplierStart);
+      
+      // Get tokens per second from config
+      const tokensPerSecond = miningRates[currentMultiplier]?.rate || (currentMultiplier * 0.01);
+      const pointsEarned = cappedElapsedSeconds * tokensPerSecond;
       
       // Add points earned with old multiplier
       user.currentMiningPoints += pointsEarned;
@@ -403,7 +442,7 @@ router.post('/upgrade-multiplier', async (req, res) => {
       user.currentMultiplierStartTime = now;
       
       console.log('[UPGRADE-MULTIPLIER] Recalculated points during mining:', {
-        elapsedSeconds,
+        elapsedSeconds: cappedElapsedSeconds,
         pointsEarned,
         totalPoints: user.currentMiningPoints
       });
