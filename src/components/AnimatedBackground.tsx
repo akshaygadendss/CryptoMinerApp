@@ -13,23 +13,26 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
+import { COLORS } from "../constants/mining";
 
 const { width, height } = Dimensions.get("window");
 
 export const AnimatedBackground: React.FC = () => {
-  const coins = Array.from({ length: 8 }).map(() => ({
+  const coins = Array.from({ length: 6 }).map(() => ({
     x: useSharedValue(Math.random() * width),
     y: useSharedValue(-50),
     rotate: useSharedValue(0),
   }));
-  const crystals = Array.from({ length: 7 }).map(() => ({
+  const crystals = Array.from({ length: 5 }).map(() => ({
     x: useSharedValue(Math.random() * width),
     y: useSharedValue(-50),
     rotate: useSharedValue(0),
   }));
-  const stars = Array.from({ length: 25 }).map(() => ({
+  const stars = Array.from({ length: 20 }).map(() => ({
     opacity: useSharedValue(0.3),
     scale: useSharedValue(1),
+    x: useSharedValue(Math.random() * width),
+    y: useSharedValue(Math.random() * height),
   }));
 
   useEffect(() => {
@@ -84,8 +87,8 @@ export const AnimatedBackground: React.FC = () => {
       
       cr.rotate.value = withRepeat(
         withSequence(
-          withTiming(20, { duration: 1500 }),
-          withTiming(-20, { duration: 1500 })
+          withTiming(15, { duration: 1500 }),
+          withTiming(-15, { duration: 1500 })
         ),
         -1,
         true
@@ -96,12 +99,18 @@ export const AnimatedBackground: React.FC = () => {
       const delay = i * 100;
       setTimeout(() => {
         s.opacity.value = withRepeat(
-          withSequence(withTiming(1, { duration: 1500 }), withTiming(0.2, { duration: 1500 })),
+          withSequence(
+            withTiming(1, { duration: 1500 + Math.random() * 1000 }),
+            withTiming(0.2, { duration: 1500 + Math.random() * 1000 })
+          ),
           -1,
           false
         );
         s.scale.value = withRepeat(
-          withSequence(withTiming(1.5, { duration: 1500 }), withTiming(0.8, { duration: 1500 })),
+          withSequence(
+            withTiming(1.3, { duration: 1500 + Math.random() * 1000 }),
+            withTiming(0.8, { duration: 1500 + Math.random() * 1000 })
+          ),
           -1,
           false
         );
@@ -111,7 +120,10 @@ export const AnimatedBackground: React.FC = () => {
 
   return (
     <View style={styles.container} pointerEvents="none">
-      {/* Transparent background image */}
+      {/* Main Background */}
+      <View style={styles.mainBackground} />
+
+      {/* Background Image */}
       <ImageBackground
         source={require("../../assets/logo.png")}
         style={styles.imageBackground}
@@ -161,20 +173,16 @@ export const AnimatedBackground: React.FC = () => {
       {stars.map((s, i) => {
         const style = useAnimatedStyle(() => ({
           opacity: s.opacity.value,
-          transform: [{ scale: s.scale.value }],
+          transform: [
+            { scale: s.scale.value },
+            { translateX: s.x.value },
+            { translateY: s.y.value },
+          ],
         }));
         return (
           <Animated.Text
             key={`star-${i}`}
-            style={[
-              styles.star,
-              style,
-              {
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                fontSize: 8 + Math.random() * 8,
-              },
-            ]}
+            style={[styles.star, style]}
           >
             ✦
           </Animated.Text>
@@ -192,35 +200,39 @@ const styles = StyleSheet.create({
     zIndex: 0,
     overflow: "hidden",
   },
+  mainBackground: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: COLORS.background,
+  },
   imageBackground: {
     ...StyleSheet.absoluteFillObject,
     opacity: 0.2,
   },
   coin: {
     position: "absolute",
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#FB923C",
-    borderWidth: 3,
-    borderColor: "#FDBA74",
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: COLORS.orange,
+    borderWidth: 4,
+    borderColor: COLORS.orangeLight,
     alignItems: "center",
     justifyContent: "center",
     elevation: 4,
-    shadowColor: "#FB923C",
+    shadowColor: COLORS.orange,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.5,
     shadowRadius: 4,
   },
   coinText: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: 32,
     fontWeight: "bold",
   },
   crystalWrapper: {
     position: "absolute",
-    width: 28,
-    height: 34,
+    width: 40,
+    height: 48,
     alignItems: "center",
     justifyContent: "flex-end",
   },
@@ -229,12 +241,12 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: 0,
     height: 0,
-    borderLeftWidth: 14,
-    borderRightWidth: 14,
-    borderBottomWidth: 28,
+    borderLeftWidth: 20,
+    borderRightWidth: 20,
+    borderBottomWidth: 40,
     borderLeftColor: "transparent",
     borderRightColor: "transparent",
-    borderBottomColor: "#22D3EE",
+    borderBottomColor: COLORS.cyan,
     opacity: 0.8,
   },
   crystalInner: {
@@ -242,16 +254,17 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: 0,
     height: 0,
-    borderLeftWidth: 11,
-    borderRightWidth: 11,
-    borderBottomWidth: 22,
+    borderLeftWidth: 16,
+    borderRightWidth: 16,
+    borderBottomWidth: 32,
     borderLeftColor: "transparent",
     borderRightColor: "transparent",
-    borderBottomColor: "#67E8F9",
+    borderBottomColor: COLORS.cyanLight,
   },
   star: {
     position: "absolute",
-    color: "#FCD34D",
+    color: COLORS.yellow,
+    fontSize: 8 + Math.random() * 8,
   },
 });
 

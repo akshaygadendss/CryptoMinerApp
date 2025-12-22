@@ -3,20 +3,38 @@ import {
   View,
   Text,
   TouchableOpacity,
-  StyleSheet,
   Animated,
   Modal,
   ActivityIndicator,
-  Alert,
+  ImageBackground,
+  ScrollView,
 } from 'react-native';
-import { COLORS, MINING_RATES } from '../constants/mining';
+import LinearGradient from 'react-native-linear-gradient';
+import { COLORS } from '../constants/mining';
 import api, { MiningProgress } from '../services/api';
+import { useConfig } from '../hooks/useConfig';
+import { showSuccessToast, showErrorToast, showInfoToast } from '../utils/toast';
+import styles from './MiningScreen.styles';
+import {
+  RewardedAd,
+  RewardedAdEventType,
+  AdEventType,
+  TestIds,
+} from 'react-native-google-mobile-ads';
+import {
+  BannerAd,
+  BannerAdSize,
+} from 'react-native-google-mobile-ads';
+import { useFocusEffect } from '@react-navigation/native';
+
+import notificationService from '../services/notificationService';
 
 interface MiningScreenProps {
   navigation: any;
 }
 
 const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
+  const { miningRates, loading: configLoading } = useConfig();
   const [progress, setProgress] = useState<MiningProgress>({
     currentPoints: 0,
     timeElapsed: 0,
@@ -28,7 +46,68 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
   const [currentMultiplier, setCurrentMultiplier] = useState<number>(1);
   const [showMultiplierModal, setShowMultiplierModal] = useState(false);
   const [loadingAd, setLoadingAd] = useState(false);
+  const [rewardedAd, setRewardedAd] = useState<RewardedAd | null>(null);
+
   const progressAnim = useRef(new Animated.Value(0)).current;
+  const tokensAnim = useRef(new Animated.Value(1)).current;
+
+  // NEW — Banner visibility
+  const [showBanner, setShowBanner] = useState(true);
+
+  // Show banner again when returning to this screen
+  useFocusEffect(
+    React.useCallback(() => {
+      setShowBanner(true);
+      return () => {};
+    }, [])
+  );
+
+  // Load Rewarded Ad
+  const loadRewardedAd = (onRewardEarned: (reward: any) => void) => {
+    const adUnitId = __DEV__
+      ? TestIds.REWARDED
+      : 'ca-app-pub-3644060799052014/6284342949';
+    const ad = RewardedAd.createForAdRequest(adUnitId, {
+      requestNonPersonalizedAdsOnly: true,
+    });
+
+    ad.addAdEventListener(RewardedAdEventType.LOADED, () => setRewardedAd(ad));
+    ad.addAdEventListener(RewardedAdEventType.EARNED_REWARD, onRewardEarned);
+    ad.addAdEventListener(AdEventType.ERROR, e =>
+      console.log('[AdMob] Error:', e)
+    );
+    ad.load();
+  };
+
+  // Initialize notifications
+  useEffect(() => {
+    initializeNotifications();
+    return () => {
+      notificationService.cancelMiningNotifications();
+    };
+  }, []);
+
+  const initializeNotifications = async () => {
+    try {
+      await notificationService.initialize();
+      const hasPermission = await notificationService.requestPermissions();
+
+      if (!hasPermission) {
+        showInfoToast('Please enable notifications to get mining alerts');
+      }
+
+      const unsubscribe =
+        await notificationService.setupNotificationHandlers(navigation);
+
+      return () => {
+        if (unsubscribe) unsubscribe();
+      };
+    } catch (error) {
+      console.error('[Notifications] Init error:', error);
+    }
+  };
+
+  useEffect(() => loadRewardedAd(() => {}), []);
 
   useEffect(() => {
     loadWalletAndProgress();
@@ -43,247 +122,434 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
       useNativeDriver: false,
     }).start();
 
+    Animated.sequence([
+      Animated.timing(tokensAnim, {
+        toValue: 1.15,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(tokensAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    if (progress.timeRemaining > 0 && !progress.isComplete) {
+      scheduleNotification(progress.timeRemaining, progress.currentPoints);
+    }
+
     if (progress.isComplete) {
       navigation.replace('Claim');
     }
   }, [progress]);
 
+  const scheduleNotification = async (
+    timeRemaining: number,
+    currentPoints: number
+  ) => {
+    try {
+      const scheduledNotifs =
+        await notificationService.getScheduledNotifications();
+      const existingNotif = scheduledNotifs.find(
+        n => n.notification.id === 'mining-complete'
+      );
+
+      if (!existingNotif) {
+        const rate = miningRates?.[currentMultiplier]?.rate || 0;
+        const finalTokens = currentPoints + timeRemaining * rate;
+
+        await notificationService.scheduleMiningCompleteNotification(
+          timeRemaining,
+          finalTokens
+        );
+      }
+    } catch (error) {
+      console.error('[Notifications] Schedule error:', error);
+    }
+  };
+
   const loadWalletAndProgress = async () => {
     try {
-      console.log('[MiningScreen] Loading wallet and progress...');
       const storedWallet = await api.getStoredWallet();
       if (storedWallet) {
-        console.log('[MiningScreen] Wallet found:', storedWallet);
         setWallet(storedWallet);
-        
-        // Get user data to fetch current multiplier
-        const userData = await api.getUser(storedWallet);
-        setCurrentMultiplier(userData.multiplier || 1);
-        
+        const user = await api.getUser(storedWallet);
+        setCurrentMultiplier(user.multiplier || 1);
         updateProgress();
-      } else {
-        console.log('[MiningScreen] No wallet found');
       }
-    } catch (error: any) {
-      console.error('[MiningScreen] Failed to load wallet:', {
-        message: error.message,
-        response: error.response?.data
-      });
+    } catch (e) {
+      console.error('[MiningScreen] Wallet load failed:', e);
     }
   };
 
   const updateProgress = async () => {
     try {
       const storedWallet = await api.getStoredWallet();
-      if (!storedWallet) {
-        console.log('[MiningScreen] No wallet found for progress update');
-        return;
-      }
-
-      const progressData = await api.calculateProgress(storedWallet);
-      console.log('[MiningScreen] Progress updated:', progressData);
-      setProgress(progressData);
-    } catch (error: any) {
-      console.error('[MiningScreen] Failed to update progress:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
+      if (!storedWallet) return;
+      const data = await api.calculateProgress(storedWallet);
+      setProgress(data);
+    } catch (e) {
+      console.error('[MiningScreen] Progress update failed:', e);
     }
   };
 
-  const handleUpgradeMultiplier = () => {
-    setShowMultiplierModal(true);
-  };
+  const handleUpgradeMultiplier = () => setShowMultiplierModal(true);
 
   const watchAdAndUpgrade = async () => {
     setShowMultiplierModal(false);
-    setLoadingAd(true);
-
+    if (!rewardedAd) {
+      showInfoToast('Loading ad, please try again shortly.');
+      loadRewardedAd(() => {});
+      return;
+    }
     try {
-      if (!wallet) {
-        Alert.alert('Error', 'Wallet not found');
-        return;
-      }
-
-      // Calculate next multiplier (sequential progression)
       const nextMultiplier = currentMultiplier + 1;
+      if (!wallet) return showErrorToast('Wallet not found');
+      if (nextMultiplier > 6)
+        return showInfoToast('You have reached the max multiplier (6×)');
 
-      // Validate max multiplier
-      if (nextMultiplier > 6) {
-        Alert.alert('Maximum Reached', 'You have reached the maximum multiplier of 6×');
-        return;
-      }
+      setLoadingAd(true);
+      rewardedAd.addAdEventListener(
+        RewardedAdEventType.EARNED_REWARD,
+        async () => {
+          await api.upgradeMultiplier(wallet, nextMultiplier);
+          setCurrentMultiplier(nextMultiplier);
+          if (miningRates)
+            showSuccessToast(
+              `Now earning ${miningRates[
+                nextMultiplier
+              ].hourlyReward.toFixed(2)} tokens/hr!`,
+              `Upgraded to ${nextMultiplier}×`
+            );
+          await loadWalletAndProgress();
 
-      // Simulate ad loading/watching
-      // In production, integrate with Google AdMob:
-      // import { RewardedAd, RewardedAdEventType, TestIds } from 'react-native-google-mobile-ads';
-      
-      await new Promise<void>(resolve => setTimeout(() => resolve(), 2000)); // Simulate ad duration
-
-      // After ad is watched, upgrade multiplier
-      console.log('[MiningScreen] Upgrading multiplier:', { 
-        current: currentMultiplier, 
-        next: nextMultiplier 
-      });
-      
-      await api.upgradeMultiplier(wallet, nextMultiplier);
-      
-      setCurrentMultiplier(nextMultiplier);
-      
-      // Show success message
-      Alert.alert(
-        'Success!', 
-        `Multiplier upgraded to ${nextMultiplier}×\nYou now earn ${MINING_RATES[nextMultiplier].hourlyReward.toFixed(2)} tokens/hour`
+          if (progress.timeRemaining > 0) {
+            scheduleNotification(
+              progress.timeRemaining,
+              progress.currentPoints
+            );
+          }
+        }
       );
-      
-      // Reload progress to reflect new multiplier
-      await loadWalletAndProgress();
-      
-    } catch (error: any) {
-      console.error('[MiningScreen] Failed to upgrade multiplier:', error);
-      const errorMessage = error.response?.data?.message || 'Failed to upgrade multiplier. Please try again.';
-      Alert.alert('Error', errorMessage);
-    } finally {
+
+      rewardedAd.addAdEventListener(AdEventType.CLOSED, () => {
+        setLoadingAd(false);
+        loadRewardedAd(() => {});
+      });
+
+      rewardedAd.show();
+    } catch (e) {
+      showErrorToast('Failed to show ad. Try again later.');
       setLoadingAd(false);
     }
   };
 
-  const formatTime = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+const formatTime = (seconds: number): string => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return `${h.toString().padStart(2, '0')}:${m
+      .toString()
+      .padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
+
+  if (configLoading || !miningRates)
+    return (
+      <LinearGradient
+        colors={[COLORS.background, COLORS.navyLight, COLORS.darkCard]}
+        style={styles.container}
+      >
+        <View style={styles.content}>
+          <Text style={styles.title}>Loading...</Text>
+        </View>
+      </LinearGradient>
+    );
 
   const canUpgrade = currentMultiplier < 6;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>Mining in Progress</Text>
-
-        <View style={styles.miningCard}>
-          <Text style={styles.tokensLabel}>Tokens Mined</Text>
-          <Text style={styles.tokensAmount}>
-            {progress.currentPoints.toFixed(4)}
+    <ImageBackground
+      source={require('../../assets/images/miningScreen/bg.png')}
+      style={{ flex: 1, width: '100%', height: '100%' }}
+      resizeMode="cover"
+    >
+      <ScrollView
+        contentContainerStyle={{
+          flexGrow: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          paddingVertical: 40,
+        }}
+      >
+        {/* Mining Info Section */}
+        <ImageBackground
+          source={require('../../assets/images/miningScreen/signup_card.png')}
+          style={{
+            width: 340,
+            height: 400,
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingHorizontal: 25,
+            marginBottom: 1,
+          }}
+          resizeMode="contain"
+        >
+          <Text
+            style={{
+              color: '#00FFFF',
+              fontSize: 20,
+              fontWeight: 'bold',
+              textAlign: 'center',
+              marginBottom: 20,
+            }}
+          >
+            MINING IN PROGRESS
           </Text>
 
-          <View style={styles.multiplierBadge}>
-            <Text style={styles.multiplierText}>{currentMultiplier}× Multiplier</Text>
-          </View>
+          <Text style={{ color: '#ccc', textAlign: 'center', fontSize: 14 }}>
+            ⏱️ TIME REMAINING
+          </Text>
+          <Text
+            style={{
+              color: '#fff',
+              textAlign: 'center',
+              fontSize: 22,
+              fontWeight: 'bold',
+              marginTop: 5,
+            }}
+          >
+            {formatTime(progress.timeRemaining)}
+          </Text>
 
-          <View style={styles.progressBarContainer}>
-            <Animated.View
-              style={[
-                styles.progressBarFill,
-                {
+          {/* Progress Bar */}
+          <View style={{ marginVertical: 20, width: '80%' }}>
+            <View
+              style={{
+                height: 10,
+                backgroundColor: '#222',
+                borderRadius: 10,
+                overflow: 'hidden',
+              }}
+            >
+              <Animated.View
+                style={{
+                  height: '100%',
+                  backgroundColor: '#00FFFF',
                   width: progressAnim.interpolate({
                     inputRange: [0, 100],
                     outputRange: ['0%', '100%'],
                   }),
-                },
-              ]}
+                }}
+              />
+            </View>
+            <Text
+              style={{
+                color: '#ccc',
+                textAlign: 'center',
+                marginTop: 6,
+                fontSize: 13,
+              }}
+            >
+              {progress.progress.toFixed(1)}% COMPLETE
+            </Text>
+          </View>
+
+          {/* Tokens */}
+          <View style={{ alignItems: 'center', marginTop: 10 }}>
+            <Text style={{ color: '#FFD700', fontSize: 16 }}>
+              🪙 TOKENS MINED
+            </Text>
+            <Animated.Text
+              style={{
+                color: '#fff',
+                fontSize: 24,
+                fontWeight: 'bold',
+                transform: [{ scale: tokensAnim }],
+                marginTop: 5,
+              }}
+            >
+              {progress.currentPoints.toFixed(4)} TOKENS
+            </Animated.Text>
+          </View>
+        </ImageBackground>
+
+        {/* Banner Ad with Close Button */}
+        {showBanner && (
+          <View style={{ alignItems: 'center', marginBottom: 20 }}>
+            {/* Close button */}
+            <TouchableOpacity
+              onPress={() => setShowBanner(false)}
+              style={{
+                position: 'absolute',
+                top: -10,
+                right: -25,
+                zIndex: 50,
+                backgroundColor: 'rgba(0,0,0,0.6)',
+                padding: 4,
+                borderRadius: 12,
+              }}
+            >
+              <Text
+                style={{
+                  color: 'white',
+                  fontSize: 14,
+                  fontWeight: 'bold',
+                }}
+              >
+                ✕
+              </Text>
+            </TouchableOpacity>
+
+            {/* Banner */}
+            <BannerAd
+              unitId={
+                __DEV__
+                  ? TestIds.BANNER
+                  : 'ca-app-pub-3644060799052014/8537781821'
+              }
+              size={BannerAdSize.LARGE_BANNER}
+              requestOptions={{
+                requestNonPersonalizedAdsOnly: true,
+              }}
             />
           </View>
-          <Text style={styles.progressText}>
-            {progress.progress.toFixed(1)}% Complete
-          </Text>
-        </View>
-
-        <View style={styles.timeCard}>
-          <View style={styles.timeRow}>
-            <Text style={styles.timeLabel}>Time Elapsed</Text>
-            <Text style={styles.timeValue}>{formatTime(progress.timeElapsed)}</Text>
-          </View>
-          <View style={styles.timeRow}>
-            <Text style={styles.timeLabel}>Time Remaining</Text>
-            <Text style={styles.timeValue}>{formatTime(progress.timeRemaining)}</Text>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.timeRow}>
-            <Text style={styles.timeLabel}>Mining Rate</Text>
-            <Text style={styles.rateValue}>
-              {MINING_RATES[currentMultiplier].hourlyReward.toFixed(2)} tokens/hr
-            </Text>
-          </View>
-        </View>
-
-        {canUpgrade && (
-          <TouchableOpacity
-            style={styles.upgradeButton}
-            onPress={handleUpgradeMultiplier}
-          >
-            <Text style={styles.upgradeButtonText}>
-              🚀 Upgrade Multiplier (Watch Ad)
-            </Text>
-          </TouchableOpacity>
         )}
 
+        {/* Balance Section */}
+        <ImageBackground
+          source={require('../../assets/images/miningScreen/balance.png')}
+          style={{
+            width: 340,
+            height: 140,
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingHorizontal: 30,
+          }}
+          resizeMode="contain"
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              width: '100%',
+              alignItems: 'center',
+            }}
+          >
+            <TouchableOpacity onPress={handleUpgradeMultiplier}>
+              <Text
+                style={{
+                  color: '#00FFFF',
+                  fontSize: 14,
+                  fontWeight: 'bold',
+                }}
+              >
+                MULTIPLIER
+              </Text>
+              <Text
+                style={{
+                  color: '#fff',
+                  fontSize: 20,
+                  fontWeight: 'bold',
+                }}
+              >
+                {currentMultiplier}×
+              </Text>
+              {canUpgrade && (
+                <Text style={{ color: '#999', fontSize: 11 }}>
+                  Tap to upgrade
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            <View>
+              <Text
+                style={{
+                  color: '#00FFFF',
+                  fontSize: 14,
+                  fontWeight: 'bold',
+                }}
+              >
+                RATE
+              </Text>
+              <Text
+                style={{
+                  color: '#fff',
+                  fontSize: 20,
+                  fontWeight: 'bold',
+                }}
+              >
+                {miningRates[currentMultiplier].rate.toFixed(4)}/sec
+              </Text>
+            </View>
+          </View>
+        </ImageBackground>
+
+        {/* Back Button */}
         <TouchableOpacity
-          style={styles.backButton}
+          style={{
+            marginTop: 15,
+            backgroundColor: '#00FFFF',
+            borderRadius: 12,
+            paddingVertical: 14,
+            paddingHorizontal: 50,
+            elevation: 6,
+          }}
           onPress={() => navigation.navigate('Home')}
         >
-          <Text style={styles.backButtonText}>Back to Home</Text>
+          <Text
+            style={{
+              color: '#001F2D',
+              fontWeight: 'bold',
+              fontSize: 16,
+              textAlign: 'center',
+            }}
+          >
+            🏠 BACK TO HOME
+          </Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
 
-      {/* Multiplier Upgrade Modal */}
-      <Modal
-        visible={showMultiplierModal}
-        transparent={true}
-        animationType="slide"
-      >
+      {/* Modals (Unchanged) */}
+      <Modal visible={showMultiplierModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Upgrade Multiplier</Text>
             <Text style={styles.modalSubtitle}>
-              Watch an ad to increase your mining rate
+              Watch an ad to increase your rate
             </Text>
-
             <View style={styles.currentMultiplierInfo}>
-              <Text style={styles.infoLabel}>Current: {currentMultiplier}×</Text>
+              <Text style={styles.infoLabel}>
+                Current: {currentMultiplier}×
+              </Text>
               <Text style={styles.infoValue}>
-                {MINING_RATES[currentMultiplier].hourlyReward.toFixed(2)} tokens/hour
+                {miningRates[currentMultiplier].hourlyReward.toFixed(2)}{' '}
+                tokens/hr
               </Text>
             </View>
 
-            <View style={styles.multiplierOptions}>
-              {currentMultiplier < 6 && (
-                <TouchableOpacity
-                  style={styles.multiplierOption}
-                  onPress={watchAdAndUpgrade}
-                >
-                  <View style={styles.multiplierOptionHeader}>
-                    <Text style={styles.multiplierOptionTitle}>
-                      {currentMultiplier + 1}× Multiplier
-                    </Text>
-                    <View style={styles.adBadge}>
-                      <Text style={styles.adBadgeText}>Watch Ad</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.multiplierOptionRate}>
-                    {MINING_RATES[currentMultiplier + 1].hourlyReward.toFixed(2)} tokens/hour
-                  </Text>
-                  <Text style={styles.multiplierBoost}>
-                    +{((MINING_RATES[currentMultiplier + 1].hourlyReward - MINING_RATES[currentMultiplier].hourlyReward) / MINING_RATES[currentMultiplier].hourlyReward * 100).toFixed(0)}% increase
-                  </Text>
-                  <Text style={styles.upgradeNote}>
-                    Sequential upgrade: {currentMultiplier}× → {currentMultiplier + 1}×
-                  </Text>
-                </TouchableOpacity>
-              )}
-              {currentMultiplier >= 6 && (
-                <View style={styles.maxMultiplierMessage}>
-                  <Text style={styles.maxMultiplierText}>
-                    🎉 Maximum Multiplier Reached!
-                  </Text>
-                  <Text style={styles.maxMultiplierSubtext}>
-                    You're earning at the highest rate possible
-                  </Text>
-                </View>
-              )}
-            </View>
+            {currentMultiplier < 6 ? (
+              <TouchableOpacity
+                style={styles.multiplierOption}
+                onPress={watchAdAndUpgrade}
+              >
+                <Text style={styles.multiplierOptionTitle}>
+                  {currentMultiplier + 1}× Multiplier
+                </Text>
+                <Text style={styles.multiplierOptionRate}>
+                  {miningRates[
+                    currentMultiplier + 1
+                  ].hourlyReward.toFixed(2)}{' '}
+                  tokens/hr
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.maxMultiplierMessage}>
+                <Text style={styles.maxMultiplierText}>
+                  🎉 Max Multiplier Reached
+                </Text>
+              </View>
+            )}
 
             <TouchableOpacity
               style={styles.modalCloseButton}
@@ -295,290 +561,16 @@ const MiningScreen: React.FC<MiningScreenProps> = ({ navigation }) => {
         </View>
       </Modal>
 
-      {/* Ad Loading Modal */}
-      <Modal visible={loadingAd} transparent={true}>
+      <Modal visible={loadingAd} transparent>
         <View style={styles.adLoadingOverlay}>
           <View style={styles.adLoadingContent}>
             <ActivityIndicator size="large" color={COLORS.primary} />
             <Text style={styles.adLoadingText}>Loading Advertisement...</Text>
-            <Text style={styles.adLoadingSubtext}>Please wait</Text>
           </View>
         </View>
       </Modal>
-    </View>
+    </ImageBackground>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    textAlign: 'center',
-    marginBottom: 30,
-  },
-  miningCard: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 16,
-    padding: 30,
-    marginBottom: 20,
-    alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  tokensLabel: {
-    fontSize: 18,
-    color: COLORS.textLight,
-    marginBottom: 10,
-  },
-  tokensAmount: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: COLORS.bitcoin,
-    marginBottom: 15,
-  },
-  multiplierBadge: {
-    backgroundColor: COLORS.secondary,
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    marginBottom: 20,
-  },
-  multiplierText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  progressBarContainer: {
-    width: '100%',
-    height: 20,
-    backgroundColor: COLORS.background,
-    borderRadius: 10,
-    overflow: 'hidden',
-    marginBottom: 10,
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: COLORS.success,
-    borderRadius: 10,
-  },
-  progressText: {
-    fontSize: 16,
-    color: COLORS.text,
-    fontWeight: '600',
-  },
-  timeCard: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  timeRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-  },
-  timeLabel: {
-    fontSize: 16,
-    color: COLORS.textLight,
-  },
-  timeValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.text,
-  },
-  rateValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.success,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: COLORS.textLight,
-    marginVertical: 10,
-    opacity: 0.3,
-  },
-  upgradeButton: {
-    backgroundColor: COLORS.secondary,
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  upgradeButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  backButton: {
-    backgroundColor: COLORS.textLight,
-    paddingVertical: 15,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  backButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 20,
-    padding: 20,
-    width: '90%',
-    maxHeight: '85%',
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.text,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: COLORS.textLight,
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  currentMultiplierInfo: {
-    backgroundColor: COLORS.background,
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 20,
-    alignItems: 'center',
-  },
-  infoLabel: {
-    fontSize: 16,
-    color: COLORS.textLight,
-    marginBottom: 5,
-  },
-  infoValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.bitcoin,
-  },
-  multiplierOptions: {
-    marginBottom: 20,
-  },
-  multiplierOption: {
-    backgroundColor: COLORS.background,
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
-  },
-  multiplierOptionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  multiplierOptionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.text,
-  },
-  multiplierOptionRate: {
-    fontSize: 14,
-    color: COLORS.textLight,
-    marginBottom: 5,
-  },
-  multiplierBoost: {
-    fontSize: 12,
-    color: COLORS.success,
-    fontWeight: '600',
-  },
-  upgradeNote: {
-    fontSize: 11,
-    color: COLORS.textLight,
-    marginTop: 8,
-    fontStyle: 'italic',
-  },
-  maxMultiplierMessage: {
-    backgroundColor: COLORS.success,
-    padding: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  maxMultiplierText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 5,
-  },
-  maxMultiplierSubtext: {
-    fontSize: 14,
-    color: '#FFFFFF',
-    opacity: 0.9,
-  },
-  adBadge: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-  },
-  adBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-  modalCloseButton: {
-    backgroundColor: COLORS.background,
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  modalCloseButtonText: {
-    color: COLORS.text,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  adLoadingOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  adLoadingContent: {
-    backgroundColor: COLORS.cardBg,
-    padding: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-  },
-  adLoadingText: {
-    color: COLORS.text,
-    fontSize: 16,
-    marginTop: 15,
-    fontWeight: 'bold',
-  },
-  adLoadingSubtext: {
-    color: COLORS.textLight,
-    fontSize: 14,
-    marginTop: 5,
-  },
-});
 
 export default MiningScreen;

@@ -1,54 +1,138 @@
-import React, { useState, useEffect } from 'react';
+/* FULL UPDATED FILE WITH SEPARATE LEADERBOARD + ADS BUTTON STYLES */
+
+import React, { useState, useEffect, useRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
   TouchableOpacity,
-  StyleSheet,
-  Image,
-  Alert,
   Modal,
   ScrollView,
+  Animated,
+  ImageBackground,
+  Image,
+  StyleSheet,
+  Easing,
 } from 'react-native';
-import { COLORS, DURATION_OPTIONS, MINING_RATES } from '../constants/mining';
-import api, { User } from '../services/api';
+import LinearGradient from 'react-native-linear-gradient';
+import { COLORS } from '../constants/mining';
+import api, { User, UserSummary } from '../services/api';
+import { useConfig } from '../hooks/useConfig';
+import { styles as baseStyles } from './HomeScreen.styles';
+import { showSuccessToast, showErrorToast, showInfoToast } from '../utils/toast';
 
 interface HomeScreenProps {
   navigation: any;
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
+  const { miningRates, durationOptions, loading: configLoading } = useConfig();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [totalBalance, setTotalBalance] = useState<number>(0);
   const [showDurationModal, setShowDurationModal] = useState(false);
   const [showMultiplierModal, setShowMultiplierModal] = useState(false);
   const [selectedHour, setSelectedHour] = useState(1);
   const [selectedMultiplier, setSelectedMultiplier] = useState(1);
 
+  const [balanceAnim] = useState(new Animated.Value(1));
+  const [mineNowAnim] = useState(new Animated.Value(1));
+
+  // Pulse animation for buttons
+  const [adsPulseAnim] = useState(new Animated.Value(1));
+
   useEffect(() => {
     loadUserData();
   }, []);
 
+  useFocusEffect(
+    React.useCallback(() => {
+      loadUserData();
+      return undefined;
+    }, [])
+  );
+
+  // Balance bump effect
+  useEffect(() => {
+    if (user) {
+      Animated.sequence([
+        Animated.timing(balanceAnim, {
+          toValue: 1.3,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(balanceAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [user?.totalEarned]);
+
+  // Mine Now pulse
+  useEffect(() => {
+    mineNowAnim.setValue(1);
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(mineNowAnim, {
+          toValue: user?.status === 'mining' ? 1.15 : 1.05,
+          duration: user?.status === 'mining' ? 800 : 1000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(mineNowAnim, {
+          toValue: 1,
+          duration: user?.status === 'mining' ? 800 : 1000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [user?.status]);
+
+  // Pulse for Ads & Leaderboard buttons
+  useEffect(() => {
+    adsPulseAnim.setValue(1);
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(adsPulseAnim, {
+          toValue: 1.08,
+          duration: 1000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(adsPulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+
   const loadUserData = async () => {
     try {
-      console.log('[HomeScreen] Loading user data...');
       const wallet = await api.getStoredWallet();
       if (!wallet) {
-        console.log('[HomeScreen] No wallet found, redirecting to Signup');
         navigation.replace('Signup');
         return;
       }
-      console.log('[HomeScreen] Fetching user data for wallet:', wallet);
       const userData = await api.getUser(wallet);
-      console.log('[HomeScreen] User data loaded:', userData);
       setUser(userData);
+
+      try {
+        const summary: UserSummary = await api.getUserSummary(wallet);
+        setTotalBalance(summary.totalBalance || 0);
+      } catch {
+        setTotalBalance(userData?.totalEarned || 0);
+      }
+
     } catch (error: any) {
-      console.error('[HomeScreen] Failed to load user data:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
-      const errorMessage = error.response?.data?.error || error.message || 'Failed to load user data';
-      Alert.alert('Error', errorMessage);
+      const msg = error.response?.data?.error || error.message;
+      showErrorToast(msg);
     } finally {
       setLoading(false);
     }
@@ -57,472 +141,370 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const handleStartMining = () => {
     if (user?.status === 'mining') {
       navigation.navigate('Mining');
-    } else if (user?.status === 'ready_to_claim') {
-      navigation.navigate('Claim');
     } else {
       setShowDurationModal(true);
     }
   };
 
-  const handleDurationNext = () => {
-    setShowDurationModal(false);
-    setShowMultiplierModal(true);
-  };
-
-  const confirmMining = async () => {
+  const handleDurationConfirm = async () => {
     if (!user) return;
-    
-    setShowMultiplierModal(false);
+    setShowDurationModal(false);
     setLoading(true);
-    
     try {
-      console.log('[HomeScreen] Starting mining:', {
-        wallet: user.wallet,
-        selectedHour,
-        multiplier: selectedMultiplier
-      });
-      await api.startMining(user.wallet, selectedHour, selectedMultiplier);
-      console.log('[HomeScreen] Mining started successfully, navigating to Mining screen');
+      await api.startMining(user.wallet, selectedHour, 1);
+      showSuccessToast(`Mining started for ${selectedHour} hour(s)!`);
       navigation.navigate('Mining');
     } catch (error: any) {
-      console.error('[HomeScreen] Failed to start mining:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
-      const errorMessage = error.response?.data?.error || error.message || 'Failed to start mining';
-      Alert.alert('Error', errorMessage);
+      const msg = error.response?.data?.error || error.message;
+      showErrorToast(msg);
     } finally {
       setLoading(false);
     }
   };
 
-  const getButtonText = () => {
-    if (!user) return 'Loading...';
-    if (user.status === 'mining') return 'Continue Mining';
-    if (user.status === 'ready_to_claim') return 'Claim Rewards';
-    return 'Start Mining';
+  const handleLogout = async () => {
+    await AsyncStorage.removeItem('wallet');
+    showInfoToast('Logged Out');
+    navigation.replace('Signup');
   };
 
-  if (loading) {
+  if (loading || configLoading || !miningRates || !durationOptions) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.loadingText}>Loading...</Text>
-      </View>
+      <LinearGradient colors={[COLORS.background, COLORS.navyLight, COLORS.darkCard]} style={baseStyles.container}>
+        <View style={baseStyles.loadingContainer}>
+          <Text style={baseStyles.loadingText}>Loading...</Text>
+        </View>
+      </LinearGradient>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.walletContainer}>
-        <Text style={styles.walletLabel}>Wallet ID</Text>
-        <Text style={styles.walletId} numberOfLines={1} ellipsizeMode="middle">
-          {user?.wallet || 'Loading...'}
-        </Text>
+    <ImageBackground
+      source={require('../../assets/images/homescreen/bg.png')}
+      style={baseStyles.container}
+      resizeMode="cover"
+    >
+
+      {/* Avatar */}
+      <View style={localStyles.avatarCard}>
+        <View style={localStyles.avatarLeft}>
+          <Image source={require('../../assets/images/homescreen/avatar.png')} style={localStyles.avatarImage} />
+        </View>
+        <View style={localStyles.avatarTextContainer}>
+          <Text style={localStyles.avatarTitle}>
+            {user?.wallet ? `${user.wallet.slice(0, 6)}....` : 'MINER'}
+          </Text>
+        </View>
       </View>
 
-      <Image
-        source={require('../../assets/logo.png')}
-        style={styles.headerImage}
-        resizeMode="cover"
-      />
-
-      <View style={styles.content}>
-        <Text style={styles.title}>Mining Village</Text>
-        
-        <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>Total Balance</Text>
-          <Text style={styles.balanceAmount}>
-            {user?.totalEarned.toFixed(4) || '0.0000'}
-          </Text>
-          <Text style={styles.balanceUnit}>Tokens</Text>
-        </View>
-
-        <View style={styles.statusCard}>
-          <Text style={styles.statusLabel}>Mining Status</Text>
-          <View style={[
-            styles.statusBadge,
-            user?.status === 'mining' && styles.statusBadgeActive
-          ]}>
-            <Text style={styles.statusText}>
-              {user?.status === 'mining' ? 'ACTIVE' : 
-               user?.status === 'ready_to_claim' ? 'READY' : 'INACTIVE'}
-            </Text>
-          </View>
-        </View>
-
-        <TouchableOpacity
-          style={styles.mainButton}
-          onPress={handleStartMining}
-        >
-          <Text style={styles.mainButtonText}>{getButtonText()}</Text>
+      {/* Top Right Icons */}
+      <View style={localStyles.topRightIcons}>
+        <TouchableOpacity style={localStyles.iconButton} onPress={() => navigation.navigate('Notifications')}>
+          <Text style={localStyles.iconText}>🔔</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={localStyles.iconButton} onPress={handleLogout}>
+          <Text style={localStyles.iconText}>🚪</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Duration Selection Modal */}
-      <Modal
-        visible={showDurationModal}
-        transparent={true}
-        animationType="slide"
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Mining Duration</Text>
-            <Text style={styles.modalSubtitle}>Choose how long you want to mine</Text>
-            
-            <ScrollView style={styles.optionsList}>
-              {DURATION_OPTIONS.map((option) => (
+      {/* Balance */}
+      <View style={localStyles.balanceContainer}>
+        <Image source={require('../../assets/images/homescreen/balance.png')} style={localStyles.balanceImage} />
+        <View style={localStyles.balanceTextContainer}>
+          <Text style={localStyles.totalBalanceLabel}>Total Balance</Text>
+          <Animated.Text style={[localStyles.balanceText, { transform: [{ scale: balanceAnim }] }]}>
+            {totalBalance.toFixed(4)} TOKENS
+          </Animated.Text>
+        </View>
+      </View>
+
+      {/* Mine or Claim */}
+      {user?.status === 'ready_to_claim' ? (
+        <TouchableOpacity onPress={() => navigation.navigate('Claim')} activeOpacity={0.8} style={localStyles.claimRewardButton}>
+          <LinearGradient colors={['#FFD700', '#FFA500']} style={localStyles.claimGradient}>
+            <Text style={localStyles.claimRewardText}>🎁 CLAIM REWARD</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity onPress={handleStartMining} activeOpacity={0.8} style={localStyles.mineNowContainer}>
+          <Animated.Image
+            source={
+              user?.status === 'mining'
+                ? require('../../assets/images/homescreen/mining.png')
+                : require('../../assets/images/homescreen/mine_now.png')
+            }
+            style={[localStyles.mineNowImage, { transform: [{ scale: mineNowAnim }] }]}
+          />
+        </TouchableOpacity>
+      )}
+
+      {/* Duration Modal */}
+      <Modal visible={showDurationModal} transparent animationType="slide">
+        <View style={baseStyles.modalOverlay}>
+          <LinearGradient colors={[COLORS.darkCard, COLORS.cardBg]} style={baseStyles.modalContent}>
+            <Text style={baseStyles.modalTitle}>Select Mining Duration</Text>
+            <Text style={baseStyles.modalSubtitle}>Mining will start at 1× multiplier</Text>
+            <ScrollView>
+              {durationOptions.map((option) => (
                 <TouchableOpacity
                   key={option.value}
-                  style={[
-                    styles.optionItem,
-                    selectedHour === option.value && styles.optionItemSelected
-                  ]}
+                  style={[baseStyles.optionItem, selectedHour === option.value && baseStyles.optionItemSelected]}
                   onPress={() => setSelectedHour(option.value)}
                 >
-                  <View style={styles.optionLeft}>
-                    <Text style={[
-                      styles.optionText,
-                      selectedHour === option.value && styles.optionTextSelected
-                    ]}>
-                      {option.label}
-                    </Text>
-                  </View>
-                  <View style={styles.optionRight}>
-                    <Text style={[
-                      styles.optionReward,
-                      selectedHour === option.value && styles.optionRewardSelected
-                    ]}>
-                      {(MINING_RATES[1].hourlyReward * option.value).toFixed(0)} tokens
-                    </Text>
-                  </View>
+                  <Text style={baseStyles.optionText}>{option.label}</Text>
+                  <Text style={baseStyles.optionReward}>
+                    {(miningRates[1].hourlyReward * option.value).toFixed(2)} tokens
+                  </Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
 
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setShowDurationModal(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+            <View style={baseStyles.modalButtons}>
+              <TouchableOpacity style={[baseStyles.modalButton, baseStyles.cancelButton]} onPress={() => setShowDurationModal(false)}>
+                <Text style={baseStyles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.confirmButton]}
-                onPress={handleDurationNext}
-              >
-                <Text style={styles.confirmButtonText}>Next</Text>
+
+              <TouchableOpacity style={[baseStyles.modalButton, baseStyles.confirmButton]} onPress={handleDurationConfirm}>
+                <Text style={baseStyles.confirmButtonText}>Start Mining</Text>
               </TouchableOpacity>
             </View>
-          </View>
+
+          </LinearGradient>
         </View>
       </Modal>
 
-      {/* Multiplier Selection Modal */}
-      <Modal
-        visible={showMultiplierModal}
-        transparent={true}
-        animationType="slide"
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Multiplier</Text>
-            <Text style={styles.modalSubtitle}>
-              Higher multipliers earn more tokens per hour
-            </Text>
-            <Text style={styles.modalInfo}>
-              💡 You can upgrade multiplier later by watching ads
-            </Text>
-            
-            <ScrollView style={styles.multiplierList}>
-              {[1, 2, 3, 4, 5, 6].map((mult) => (
-                <TouchableOpacity
-                  key={mult}
-                  style={[
-                    styles.multiplierCard,
-                    selectedMultiplier === mult && styles.multiplierCardSelected
-                  ]}
-                  onPress={() => setSelectedMultiplier(mult)}
-                >
-                  <View style={styles.multiplierHeader}>
-                    <View style={styles.multiplierBadge}>
-                      <Text style={styles.multiplierBadgeText}>{mult}×</Text>
-                    </View>
-                    {selectedMultiplier === mult && (
-                      <View style={styles.selectedIndicator}>
-                        <Text style={styles.selectedIndicatorText}>✓</Text>
-                      </View>
-                    )}
-                  </View>
-                  
-                  <View style={styles.multiplierBody}>
-                    <Text style={styles.multiplierRate}>
-                      {MINING_RATES[mult].hourlyReward.toFixed(0)} tokens/hour
-                    </Text>
-                    <Text style={styles.multiplierTotal}>
-                      Total: {(MINING_RATES[mult].hourlyReward * selectedHour).toFixed(0)} tokens
-                    </Text>
-                  </View>
+      {/* Bottom Tabs */}
+      <View style={localStyles.bottomTabs}>
+        <TouchableOpacity
+          style={localStyles.tabButton}
+          onPress={() => navigation.navigate('Leaderboard')}
+          activeOpacity={0.7}
+        >
+          <Text style={localStyles.tabIcon}>🏆</Text>
+          <Text style={localStyles.tabLabel}>Leaderboard</Text>
+        </TouchableOpacity>
 
-                  {mult > 1 && (
-                    <View style={styles.adRequirement}>
-                      <Text style={styles.adRequirementText}>
-                        🎬 Requires watching ad
-                      </Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+        <TouchableOpacity
+          style={localStyles.tabButton}
+          onPress={() => navigation.navigate('Referral')}
+          activeOpacity={0.7}
+        >
+          <Text style={localStyles.tabIcon}>🎁</Text>
+          <Text style={localStyles.tabLabel}>Referral</Text>
+        </TouchableOpacity>
 
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setShowMultiplierModal(false);
-                  setShowDurationModal(true);
-                }}
-              >
-                <Text style={styles.cancelButtonText}>Back</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.confirmButton]}
-                onPress={confirmMining}
-              >
-                <Text style={styles.confirmButtonText}>Start Mining</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </View>
+        <TouchableOpacity
+          style={localStyles.tabButton}
+          onPress={() => navigation.navigate('WatchAds')}
+          activeOpacity={0.7}
+        >
+          <Text style={localStyles.tabIcon}>📺</Text>
+          <Text style={localStyles.tabLabel}>Watch Ads</Text>
+        </TouchableOpacity>
+      </View>
+
+    </ImageBackground>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  walletContainer: {
+
+/* ===================================================================================== */
+/*                                      STYLES                                           */
+/* ===================================================================================== */
+
+const localStyles = StyleSheet.create({
+
+  avatarCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
     position: 'absolute',
-    top: 10,
-    left: 10,
-    zIndex: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    top: 40,
+    left: 20,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderWidth: 1,
+    borderColor: '#00FFFF',
+    borderRadius: 15,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    borderRadius: 10,
-    maxWidth: '60%',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
+    height: 56,
+    zIndex: 10,
   },
-  walletLabel: {
-    fontSize: 10,
-    color: COLORS.textLight,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  walletId: {
-    fontSize: 12,
-    color: COLORS.primary,
-    fontWeight: 'bold',
-    fontFamily: 'monospace',
-  },
-  headerImage: {
-    width: '100%',
-    height: 200,
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-  },
-  loadingText: {
-    textAlign: 'center',
-    marginTop: 50,
-    fontSize: 18,
-    color: COLORS.text,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  balanceCard: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
+
+  avatarLeft: {
+    justifyContent: 'center',
     alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    backgroundColor: 'rgba(0,255,255,0.1)',
+    borderRadius: 30,
+    padding: 5,
+    borderWidth: 1,
+    borderColor: '#00FFFF',
   },
-  balanceLabel: {
-    fontSize: 16,
-    color: COLORS.textLight,
-    marginBottom: 10,
+
+  avatarImage: { width: 30, height: 30, borderRadius: 20 },
+
+  avatarTextContainer: { marginLeft: 10 },
+
+  avatarTitle: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 15,
   },
-  balanceAmount: {
-    fontSize: 42,
-    fontWeight: 'bold',
-    color: COLORS.bitcoin,
+
+  topRightIcons: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    flexDirection: 'row',
+    gap: 10,
+    zIndex: 11,
   },
-  balanceUnit: {
-    fontSize: 18,
-    color: COLORS.textLight,
-    marginTop: 5,
-  },
-  statusCard: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 30,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  statusLabel: {
-    fontSize: 16,
-    color: COLORS.textLight,
-    marginBottom: 10,
-  },
-  statusBadge: {
-    backgroundColor: COLORS.textLight,
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-  },
-  statusBadgeActive: {
-    backgroundColor: COLORS.success,
-  },
-  statusText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  mainButton: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: 18,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  mainButtonText: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  iconButton: {
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderWidth: 1,
+    borderColor: '#00FFFF',
+    borderRadius: 15,
+    width: 56,
+    height: 56,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalContent: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 20,
-    padding: 20,
-    width: '90%',
-    maxHeight: '80%',
+
+  iconText: {
+    fontSize: 24,
   },
-  modalTitle: {
+
+  dashboardTitle: {
+    position: 'absolute',
+    top: 120,
+    alignSelf: 'center',
+    color: '#00FFFF',
+    fontSize: 24,
+    fontWeight: 'bold',
+    textShadowColor: '#00FFFF',
+    textShadowRadius: 10,
+  },
+
+  balanceContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 160,
+  },
+
+  balanceImage: { width: 310, height: 180, resizeMode: 'contain' },
+
+  balanceTextContainer: {
+    position: 'absolute',
+    alignItems: 'center',
+  },
+
+  totalBalanceLabel: { color: '#9ae6ff', fontSize: 14, fontWeight: '600' },
+
+  balanceText: { color: '#fff', fontSize: 22, fontWeight: 'bold', marginTop: 4 },
+
+  /* Buttons row */
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 5,
+    gap: 25,
+  },
+
+  leaderboardWrapper: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  leaderboardContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  leaderboardImage: {
+    width: 155,
+    height: 160,
+    resizeMode: 'contain',
+  },
+
+  adsWrapper: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  adsContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  adsImage: {
+    width: 150,
+    height: 100,
+    resizeMode: 'contain',
+  },
+
+  mineNowContainer: {
+    position: 'absolute',
+    bottom: 180,
+    alignSelf: 'center',
+  },
+
+  mineNowImage: {
+    width: 280,
+    height: 130,
+    resizeMode: 'contain',
+  },
+
+  claimRewardButton: {
+    position: 'absolute',
+    bottom: 200,
+    alignSelf: 'center',
+  },
+
+  claimGradient: {
+    paddingVertical: 18,
+    paddingHorizontal: 40,
+    borderRadius: 20,
+    borderWidth: 3,
+    borderColor: '#FFD700',
+  },
+
+  claimRewardText: {
+    color: '#000',
     fontSize: 22,
     fontWeight: 'bold',
-    color: COLORS.text,
-    marginBottom: 8,
-    textAlign: 'center',
   },
-  modalSubtitle: {
-    fontSize: 14,
-    color: COLORS.textLight,
-    marginBottom: 5,
-    textAlign: 'center',
-  },
-  modalInfo: {
-    fontSize: 12,
-    color: COLORS.secondary,
-    marginBottom: 20,
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  optionsList: {
-    maxHeight: 300,
-  },
-  optionItem: {
-    backgroundColor: COLORS.background,
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
+
+  bottomTabs: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderTopWidth: 2,
+    borderTopColor: '#00FFFF',
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    justifyContent: 'space-around',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
+    zIndex: 100,
   },
-  optionItemSelected: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.secondary,
-  },
-  optionLeft: {
+  tabButton: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
   },
-  optionRight: {
-    alignItems: 'flex-end',
+  tabIcon: {
+    fontSize: 28,
+    marginBottom: 4,
   },
-  optionText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  optionTextSelected: {
-    color: '#FFFFFF',
-  },
-  optionReward: {
-    fontSize: 14,
-    color: COLORS.textLight,
+  tabLabel: {
+    fontSize: 11,
+    color: '#00FFFF',
     fontWeight: '600',
   },
-  optionRewardSelected: {
-    color: '#FFFFFF',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 20,
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginHorizontal: 5,
-  },
-  cancelButton: {
-    backgroundColor: COLORS.background,
-  },
-  confirmButton: {
-    backgroundColor: COLORS.success,
-  },
-  cancelButtonText: {
-    color: COLORS.text,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  confirmButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+
 });
 
 export default HomeScreen;

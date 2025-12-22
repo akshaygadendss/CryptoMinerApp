@@ -4,11 +4,15 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Alert,
-  Modal,
+  Animated,
+  ImageBackground,
+  ActivityIndicator,
 } from 'react-native';
-import { COLORS, DURATION_OPTIONS, MINING_RATES } from '../constants/mining';
+import LinearGradient from 'react-native-linear-gradient';
+import { COLORS } from '../constants/mining';
 import api, { User } from '../services/api';
+import { showSuccessToast, showErrorToast } from '../utils/toast';
+import notificationService from '../services/notificationService';
 
 interface ClaimScreenProps {
   navigation: any;
@@ -17,9 +21,7 @@ interface ClaimScreenProps {
 const ClaimScreen: React.FC<ClaimScreenProps> = ({ navigation }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showDurationModal, setShowDurationModal] = useState(false);
-  const [selectedHour, setSelectedHour] = useState(1);
-  const [selectedMultiplier, setSelectedMultiplier] = useState(1);
+  const [rewardAnim] = useState(new Animated.Value(1));
 
   useEffect(() => {
     loadUserData();
@@ -34,18 +36,19 @@ const ClaimScreen: React.FC<ClaimScreenProps> = ({ navigation }) => {
         navigation.replace('Signup');
         return;
       }
+
+      // Ensure mining progress is calculated before fetching
+      console.log('[ClaimScreen] Calculating final progress for wallet:', wallet);
+      await api.calculateProgress(wallet);
+
       console.log('[ClaimScreen] Fetching user data for wallet:', wallet);
       const userData = await api.getUser(wallet);
       console.log('[ClaimScreen] User data loaded:', userData);
       setUser(userData);
     } catch (error: any) {
-      console.error('[ClaimScreen] Failed to load user data:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
+      console.error('[ClaimScreen] Failed to load user data:', error);
       const errorMessage = error.response?.data?.error || error.message || 'Failed to load user data';
-      Alert.alert('Error', errorMessage);
+      showErrorToast(errorMessage, 'Error Loading Data');
     } finally {
       setLoading(false);
     }
@@ -53,50 +56,37 @@ const ClaimScreen: React.FC<ClaimScreenProps> = ({ navigation }) => {
 
   const handleClaim = async () => {
     if (!user) return;
-
     setLoading(true);
     try {
       console.log('[ClaimScreen] Claiming rewards for wallet:', user.wallet);
-      await api.claimReward(user.wallet);
+      const result = await api.claimReward(user.wallet);
       console.log('[ClaimScreen] Rewards claimed successfully');
-      setShowDurationModal(true);
+
+      // Cancel any pending mining notifications since rewards are claimed
+      await notificationService.cancelMiningNotifications();
+
+      // Reward pulse animation
+      Animated.sequence([
+        Animated.timing(rewardAnim, {
+          toValue: 1.05,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(rewardAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      showSuccessToast(`${user.currentMiningPoints.toFixed(4)} tokens claimed! 🎉`, 'Rewards Claimed');
+
+      // Navigate back to Home
+      setTimeout(() => navigation.replace('Home'), 1000);
     } catch (error: any) {
-      console.error('[ClaimScreen] Failed to claim rewards:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
+      console.error('[ClaimScreen] Failed to claim rewards:', error);
       const errorMessage = error.response?.data?.error || error.message || 'Failed to claim rewards';
-      Alert.alert('Error', errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const startNewMining = async () => {
-    if (!user) return;
-
-    setShowDurationModal(false);
-    setLoading(true);
-
-    try {
-      console.log('[ClaimScreen] Starting new mining session:', {
-        wallet: user.wallet,
-        selectedHour,
-        selectedMultiplier
-      });
-      await api.startMining(user.wallet, selectedHour, selectedMultiplier);
-      console.log('[ClaimScreen] Mining started, navigating to Mining screen');
-      navigation.replace('Mining');
-    } catch (error: any) {
-      console.error('[ClaimScreen] Failed to start mining:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
-      const errorMessage = error.response?.data?.error || error.message || 'Failed to start mining';
-      Alert.alert('Error', errorMessage);
-      navigation.replace('Home');
+      showErrorToast(errorMessage, 'Claim Failed');
     } finally {
       setLoading(false);
     }
@@ -104,306 +94,167 @@ const ClaimScreen: React.FC<ClaimScreenProps> = ({ navigation }) => {
 
   if (loading || !user) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.loadingText}>Loading...</Text>
-      </View>
+      <LinearGradient
+        colors={[COLORS.background, COLORS.navyLight, COLORS.darkCard]}
+        style={styles.container}
+      >
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.cyan} />
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </LinearGradient>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <ImageBackground
+      source={require('../../assets/images/miningScreen/bg.png')}
+      style={styles.bg}
+      resizeMode="cover"
+    >
       <View style={styles.content}>
-        <Text style={styles.title}>🎉 Mining Complete!</Text>
+        <Text style={styles.title}>MINING COMPLETE! 🎉</Text>
+        <Text style={styles.subtitle}>You've successfully mined tokens!</Text>
 
-        <View style={styles.rewardCard}>
-          <Text style={styles.rewardLabel}>Tokens Mined</Text>
-          <Text style={styles.rewardAmount}>
-            {user.currentMiningPoints.toFixed(4)}
-          </Text>
-          <Text style={styles.rewardUnit}>Tokens</Text>
-        </View>
+        {/* Reward Section */}
+        <ImageBackground
+          source={require('../../assets/images/miningScreen/balance.png')}
+          style={styles.rewardBackground}
+          resizeMode="contain"
+        >
+          <Animated.View style={{ transform: [{ scale: rewardAnim }] }}>
+            <View style={styles.rewardHeader}>
+              <Text style={styles.rewardIcon}>✨</Text>
+              <Text style={styles.rewardLabel}>SESSION EARNINGS</Text>
+            </View>
 
-        <View style={styles.totalCard}>
-          <Text style={styles.totalLabel}>Total Balance</Text>
-          <Text style={styles.totalAmount}>
-            {user.totalEarned.toFixed(4)}
-          </Text>
-        </View>
+            <Text style={styles.rewardAmount}>
+              {user.currentMiningPoints.toFixed(4)} TOKENS
+            </Text>
+            <Text style={styles.sessionInfo}>Earned in this mining session</Text>
+          </Animated.View>
+        </ImageBackground>
 
+        {/* Claim Button */}
         <TouchableOpacity
-          style={styles.claimButton}
+          style={[styles.claimButton, loading && styles.buttonDisabled]}
           onPress={handleClaim}
           disabled={loading}
         >
+          <Text style={styles.claimButtonIcon}>🏆</Text>
           <Text style={styles.claimButtonText}>
-            {loading ? 'Claiming...' : 'Claim Rewards'}
+            {loading ? 'Claiming...' : 'CLAIM REWARDS'}
           </Text>
         </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.homeButton}
-          onPress={() => navigation.navigate('Home')}
-        >
-          <Text style={styles.homeButtonText}>Back to Home</Text>
-        </TouchableOpacity>
       </View>
-
-      <Modal
-        visible={showDurationModal}
-        transparent={true}
-        animationType="slide"
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Start New Mining Session</Text>
-
-            {DURATION_OPTIONS.map((option) => (
-              <TouchableOpacity
-                key={option.value}
-                style={[
-                  styles.optionItem,
-                  selectedHour === option.value && styles.optionItemSelected
-                ]}
-                onPress={() => setSelectedHour(option.value)}
-              >
-                <Text style={styles.optionText}>{option.label}</Text>
-                <Text style={styles.optionReward}>
-                  {(MINING_RATES[selectedMultiplier as keyof typeof MINING_RATES].hourlyReward * option.value).toFixed(2)} tokens
-                </Text>
-              </TouchableOpacity>
-            ))}
-
-            <Text style={styles.modalSubtitle}>Select Multiplier</Text>
-            <View style={styles.multiplierContainer}>
-              {[1, 2, 3, 4, 5, 6].map((mult) => (
-                <TouchableOpacity
-                  key={mult}
-                  style={[
-                    styles.multiplierButton,
-                    selectedMultiplier === mult && styles.multiplierButtonSelected
-                  ]}
-                  onPress={() => setSelectedMultiplier(mult)}
-                >
-                  <Text style={styles.multiplierText}>{mult}×</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setShowDurationModal(false);
-                  navigation.replace('Home');
-                }}
-              >
-                <Text style={styles.cancelButtonText}>Later</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.confirmButton]}
-                onPress={startNewMining}
-              >
-                <Text style={styles.confirmButtonText}>Start Mining</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </View>
+    </ImageBackground>
   );
 };
 
 const styles = StyleSheet.create({
+  bg: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  content: {
+  loadingContainer: {
     flex: 1,
-    padding: 20,
     justifyContent: 'center',
+    alignItems: 'center',
   },
   loadingText: {
-    textAlign: 'center',
-    fontSize: 18,
-    color: COLORS.text,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: COLORS.success,
-    textAlign: 'center',
-    marginBottom: 30,
-  },
-  rewardCard: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 16,
-    padding: 30,
-    marginBottom: 20,
-    alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  rewardLabel: {
     fontSize: 18,
     color: COLORS.textLight,
-    marginBottom: 10,
+    marginTop: 10,
   },
-  rewardAmount: {
-    fontSize: 54,
-    fontWeight: 'bold',
-    color: COLORS.bitcoin,
-  },
-  rewardUnit: {
-    fontSize: 20,
-    color: COLORS.textLight,
-    marginTop: 5,
-  },
-  totalCard: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 30,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  totalLabel: {
-    fontSize: 18,
-    color: COLORS.textLight,
-  },
-  totalAmount: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.text,
-  },
-  claimButton: {
-    backgroundColor: COLORS.success,
-    paddingVertical: 18,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  claimButtonText: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  homeButton: {
-    backgroundColor: COLORS.textLight,
-    paddingVertical: 15,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  homeButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  modalOverlay: {
+  content: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 16,
   },
-  modalContent: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 20,
-    padding: 20,
-    width: '90%',
-    maxHeight: '80%',
-  },
-  modalTitle: {
-    fontSize: 22,
+  title: {
+    fontSize: 24,
     fontWeight: 'bold',
-    color: COLORS.text,
-    marginBottom: 20,
+    color: COLORS.cyan,
     textAlign: 'center',
+    marginBottom: 8,
   },
-  modalSubtitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.text,
-    marginTop: 15,
-    marginBottom: 10,
+  subtitle: {
+    fontSize: 16,
+    color: COLORS.textLight,
+    textAlign: 'center',
+    marginBottom: 32,
   },
-  optionItem: {
-    backgroundColor: COLORS.background,
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  rewardBackground: {
+    width: 340,
+    height: 200,
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 30,
   },
-  optionItemSelected: {
-    backgroundColor: COLORS.primary,
+  rewardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
   },
-  optionText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.text,
+  rewardIcon: {
+    fontSize: 24,
+    marginRight: 8,
   },
-  optionReward: {
+  rewardLabel: {
     fontSize: 14,
     color: COLORS.textLight,
+    fontWeight: '600',
   },
-  multiplierContainer: {
+  rewardAmount: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: COLORS.text,
+    textAlign: 'center',
+  },
+  sessionInfo: {
+    fontSize: 12,
+    color: COLORS.textLight,
+    textAlign: 'center',
+    marginTop: 8,
+    opacity: 0.8,
+  },
+  claimButton: {
+    backgroundColor: 'rgba(0, 163, 163, 1)',
+    borderRadius: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 32,
+    borderWidth: 4,
+    borderColor:'rgba(44, 255, 233, 1)',
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  multiplierButton: {
-    width: '30%',
-    backgroundColor: COLORS.background,
-    padding: 15,
-    borderRadius: 10,
     alignItems: 'center',
-    marginBottom: 10,
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+    width: '100%',
+    maxWidth: 400,
   },
-  multiplierButtonSelected: {
-    backgroundColor: COLORS.secondary,
+  buttonDisabled: {
+    opacity: 0.6,
   },
-  multiplierText: {
+  claimButtonIcon: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  claimButtonText: {
     fontSize: 18,
     fontWeight: 'bold',
     color: COLORS.text,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginHorizontal: 5,
-  },
-  cancelButton: {
-    backgroundColor: COLORS.background,
-  },
-  confirmButton: {
-    backgroundColor: COLORS.success,
-  },
-  cancelButtonText: {
-    color: COLORS.text,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  confirmButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
 });
 
