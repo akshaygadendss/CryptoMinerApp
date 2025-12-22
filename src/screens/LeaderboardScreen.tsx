@@ -120,13 +120,19 @@ const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({ navigation }) => 
       style={styles.container}
       resizeMode="cover"
     >
-      <LinearGradient colors={['rgba(0,0,0,0.6)', 'rgba(0,0,0,0.4)']} style={styles.overlay}>
-        <View style={styles.statueContainer}>
-          {/* Back Button */}
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonOverlay}>
-            <Text style={styles.backButtonText}>← Back</Text>
-          </TouchableOpacity>
+     <LinearGradient
+  colors={['rgba(0,0,0,0.6)', 'rgba(0,0,0,0.4)']}
+  style={styles.overlay}
+>
+  {/* FIXED BACK BUTTON (OUTSIDE ALL CONTAINERS) */}
+  <View style={styles.backButtonWrapper}>
+    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+      <Text style={styles.backButtonText}>←Back</Text>
+    </TouchableOpacity>
+  </View>
 
+
+        <View style={styles.statueContainer}>
           {/* Statue */}
           <Image
             source={require('../../assets/images/leaderboard/statue.png')}
@@ -229,6 +235,28 @@ const styles = StyleSheet.create({
     height: 100,
   },
   overlay: { flex: 1, alignItems: 'center' },
+  backButtonWrapper: {
+  position: 'absolute',
+  top: 40,
+  left: -180, // pushes it more left
+  zIndex: 100,
+},
+
+backButton: {
+  backgroundColor: 'rgba(0,0,0,0.6)',
+  paddingVertical: 6,
+  paddingHorizontal: 10,
+  borderRadius: 8,
+  borderWidth: 1,
+  borderColor: COLORS.cyan,
+},
+
+backButtonText: {
+  color: COLORS.text,
+  fontSize: 18,
+  fontWeight: '700',
+},
+
   statueContainer: {
     flex: 1,
     width: '100%',
@@ -242,21 +270,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     zIndex: 1,
-  },
-  backButtonOverlay: {
-    position: 'absolute',
-    top: 35,
-    left: 20,
-    zIndex: 4,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-  },
-  backButtonText: {
-    color: COLORS.text,
-    fontSize: 16,
-    fontWeight: '600',
   },
   leaderboardTitle: {
     position: 'absolute',
