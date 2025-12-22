@@ -3,11 +3,11 @@ import {
   TouchableOpacity,
   Text,
   StyleSheet,
-  ActivityIndicator,
   GestureResponderEvent,
   ViewStyle,
   TextStyle,
 } from 'react-native';
+import LottieView from 'lottie-react-native';
 import LinearGradient from 'react-native-linear-gradient';
 
 interface ButtonProps {
@@ -95,13 +95,23 @@ export const Button: React.FC<ButtonProps> = ({
           style={[styles.gradient, getSizeStyle()]}
         >
           {loading ? (
-            <ActivityIndicator color="#fff" />
+            <LottieView
+              source={require('../../../assets/Animations/Loading_circles.json')}
+              autoPlay
+              loop
+              style={styles.loadingAnimation}
+            />
           ) : (
             <Text style={[styles.text, textVariantStyle, textStyle]}>{title}</Text>
           )}
         </LinearGradient>
       ) : loading ? (
-        <ActivityIndicator color="#fff" />
+        <LottieView
+          source={require('../../../assets/Animations/Loading_circles.json')}
+          autoPlay
+          loop
+          style={styles.loadingAnimation}
+        />
       ) : (
         <Text style={[styles.text, textVariantStyle, textStyle]}>{title}</Text>
       )}
@@ -110,6 +120,10 @@ export const Button: React.FC<ButtonProps> = ({
 };
 
 const styles = StyleSheet.create({
+  loadingAnimation: {
+    width: 24,
+    height: 24,
+  },
   base: {
     borderRadius: 12,
     alignItems: 'center',

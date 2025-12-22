@@ -5,10 +5,10 @@ import {
   StyleSheet,
   ImageBackground,
   FlatList,
-  ActivityIndicator,
   TouchableOpacity,
   Image,
 } from 'react-native';
+import LottieView from 'lottie-react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { COLORS } from '../constants/mining';
 import api from '../services/api';
@@ -102,7 +102,12 @@ const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({ navigation }) => 
         colors={[COLORS.background, COLORS.navyLight, COLORS.darkCard]}
         style={styles.container}
       >
-        <ActivityIndicator size="large" color={COLORS.cyan} />
+        <LottieView
+          source={require('../../assets/Animations/Loading_circles.json')}
+          autoPlay
+          loop
+          style={styles.loadingAnimation}
+        />
       </LinearGradient>
     );
   }
@@ -218,7 +223,11 @@ const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({ navigation }) => 
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingAnimation: {
+    width: 100,
+    height: 100,
+  },
   overlay: { flex: 1, alignItems: 'center' },
   statueContainer: {
     flex: 1,

@@ -5,10 +5,10 @@ import {
   StyleSheet,
   FlatList,
   ImageBackground,
-  ActivityIndicator,
   TouchableOpacity,
   RefreshControl,
 } from 'react-native';
+import LottieView from 'lottie-react-native';
 import { COLORS } from '../constants/mining';
 import api from '../services/api';
 import { showErrorToast } from '../utils/toast';
@@ -194,7 +194,12 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation })
         resizeMode="cover"
       >
         <View style={globalStyles.centerContainer}>
-          <ActivityIndicator size="large" color={COLORS.cyan} />
+          <LottieView
+            source={require('../../assets/Animations/Loading_circles.json')}
+            autoPlay
+            loop
+            style={styles.loadingAnimation}
+          />
           <Text style={styles.loadingText}>Loading notifications...</Text>
         </View>
       </ImageBackground>
@@ -341,6 +346,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.textLight,
     marginTop: 10,
+  },
+
+  loadingAnimation: {
+    width: 100,
+    height: 100,
   },
 
   /* Error Banner */

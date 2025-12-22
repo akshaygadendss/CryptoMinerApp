@@ -16,6 +16,12 @@ export const styles = StyleSheet.create({
     fontSize: 18,
     color: COLORS.text,
   },
+  logoutIcon: {
+  width: 26,
+  height: 26,
+  tintColor: '#FFFFFF', // keeps it white (remove if image already white)
+},
+
   content: {
     flex: 1,
     padding: 16,

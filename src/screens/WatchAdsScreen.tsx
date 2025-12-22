@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ImageBackground,
-  ActivityIndicator,
   Animated,
   Modal,
 } from 'react-native';
@@ -213,7 +212,12 @@ const WatchAdsScreen: React.FC<WatchAdsScreenProps> = ({ navigation }) => {
           <View style={{ alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
             {lottieLoading ? (
               <View style={{ alignItems: 'center' }}>
-                <ActivityIndicator size="large" color="#0ff" />
+                <LottieView
+                  source={require('../../assets/Animations/Loading_circles.json')}
+                  autoPlay
+                  loop
+                  style={styles.adLoadingAnimation}
+                />
                 <Text style={styles.loadingText}>Loading Ad...</Text>
               </View>
             ) : lottieFailed ? (
@@ -246,7 +250,12 @@ const WatchAdsScreen: React.FC<WatchAdsScreenProps> = ({ navigation }) => {
         >
           {isButtonLoading ? (
             <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
-              <ActivityIndicator size="small" color="#003640" />
+              <LottieView
+                source={require('../../assets/Animations/Loading_circles.json')}
+                autoPlay
+                loop
+                style={styles.buttonLoadingAnimation}
+              />
               <Text style={[styles.watchText, { marginLeft: 8 }]}>Loading...</Text>
             </View>
           ) : (
@@ -316,6 +325,15 @@ const WatchAdsScreen: React.FC<WatchAdsScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   bg: { flex: 1 },
   container: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+
+  adLoadingAnimation: {
+    width: 80,
+    height: 80,
+  },
+  buttonLoadingAnimation: {
+    width: 20,
+    height: 20,
+  },
 
   title: {
     fontSize: 30,

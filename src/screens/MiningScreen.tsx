@@ -5,10 +5,10 @@ import {
   TouchableOpacity,
   Animated,
   Modal,
-  ActivityIndicator,
   ImageBackground,
   ScrollView,
 } from 'react-native';
+import LottieView from 'lottie-react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { COLORS } from '../constants/mining';
 import api, { MiningProgress } from '../services/api';
@@ -562,10 +562,32 @@ const formatTime = (seconds: number): string => {
       </Modal>
 
       <Modal visible={loadingAd} transparent>
-        <View style={styles.adLoadingOverlay}>
-          <View style={styles.adLoadingContent}>
-            <ActivityIndicator size="large" color={COLORS.primary} />
-            <Text style={styles.adLoadingText}>Loading Advertisement...</Text>
+        <View style={{
+          flex: 1,
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}>
+          <View style={{
+            backgroundColor: 'rgba(0, 0, 0, 0.9)',
+            padding: 30,
+            borderRadius: 15,
+            alignItems: 'center',
+            borderWidth: 1,
+            borderColor: '#00FFFF',
+          }}>
+            <LottieView
+              source={require('../../assets/Animations/Loading_circles.json')}
+              autoPlay
+              loop
+              style={{ width: 80, height: 80 }}
+            />
+            <Text style={{
+              color: '#fff',
+              fontSize: 16,
+              marginTop: 15,
+              textAlign: 'center',
+            }}>Loading Advertisement...</Text>
           </View>
         </View>
       </Modal>

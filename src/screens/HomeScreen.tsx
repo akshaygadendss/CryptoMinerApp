@@ -202,9 +202,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         <TouchableOpacity style={localStyles.iconButton} onPress={() => navigation.navigate('Notifications')}>
           <Text style={localStyles.iconText}>🔔</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={localStyles.iconButton} onPress={handleLogout}>
-          <Text style={localStyles.iconText}>🚪</Text>
-        </TouchableOpacity>
+       <TouchableOpacity style={localStyles.iconButton} onPress={handleLogout}>
+  <Image
+    source={require('../../assets/images/icons/logout_cryptoapp.png')}
+    style={localStyles.logoutIcon}
+    resizeMode="contain"
+  />
+</TouchableOpacity>
+
+
       </View>
 
       {/* Balance */}
@@ -430,6 +436,11 @@ const localStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+logoutIcon: {
+  width: 26,
+  height: 26,
+  tintColor: '#FFFFFF', // keeps it white (remove if image already white)
+},
 
   adsContainer: {
     justifyContent: 'center',

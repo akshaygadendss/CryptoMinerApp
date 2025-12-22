@@ -6,10 +6,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   ImageBackground,
-  ActivityIndicator,
   Share,
   Clipboard,
 } from 'react-native';
+import LottieView from 'lottie-react-native';
 import { COLORS } from '../constants/mining';
 import api from '../services/api';
 import { showSuccessToast, showErrorToast, showInfoToast } from '../utils/toast';
@@ -112,7 +112,12 @@ const ReferralScreen: React.FC<ReferralScreenProps> = ({ navigation }) => {
         resizeMode="cover"
       >
         <View style={globalStyles.centerContainer}>
-          <ActivityIndicator size="large" color={COLORS.cyan} />
+          <LottieView
+            source={require('../../assets/Animations/Loading_circles.json')}
+            autoPlay
+            loop
+            style={styles.loadingAnimation}
+          />
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
       </ImageBackground>
@@ -183,7 +188,12 @@ const ReferralScreen: React.FC<ReferralScreenProps> = ({ navigation }) => {
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <LottieView
+                  source={require('../../assets/Animations/Loading_circles.json')}
+                  autoPlay
+                  loop
+                  style={styles.buttonLoadingAnimation}
+                />
               ) : (
                 <Text style={styles.applyButtonText}>✨ APPLY CODE</Text>
               )}
@@ -254,6 +264,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.textLight,
     marginTop: 10,
+  },
+  loadingAnimation: {
+    width: 100,
+    height: 100,
+  },
+  buttonLoadingAnimation: {
+    width: 24,
+    height: 24,
   },
   card: {
     backgroundColor: COLORS.cardBg,

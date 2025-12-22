@@ -6,8 +6,8 @@ import {
   StyleSheet,
   Animated,
   ImageBackground,
-  ActivityIndicator,
 } from 'react-native';
+import LottieView from 'lottie-react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { COLORS } from '../constants/mining';
 import api, { User } from '../services/api';
@@ -99,7 +99,12 @@ const ClaimScreen: React.FC<ClaimScreenProps> = ({ navigation }) => {
         style={styles.container}
       >
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.cyan} />
+          <LottieView
+            source={require('../../assets/Animations/Loading_circles.json')}
+            autoPlay
+            loop
+            style={styles.loadingAnimation}
+          />
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
       </LinearGradient>
@@ -170,6 +175,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: COLORS.textLight,
     marginTop: 10,
+  },
+  loadingAnimation: {
+    width: 100,
+    height: 100,
   },
   content: {
     flex: 1,
