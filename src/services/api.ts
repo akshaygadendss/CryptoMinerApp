@@ -1,8 +1,8 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-//const API_URL = 'http://192.168.1.42:3000/api';
-const API_URL = 'https://cryptominerapp.onrender.com/api';
+const API_URL = 'http://192.168.1.47:3000/api';
+//const API_URL = 'https://cryptominerapp.onrender.com/api';
 
 export interface User {
   _id: string;
@@ -311,9 +311,20 @@ class API {
   async getReferralNotifications(wallet: string): Promise<{ notifications: any[]; count: number }> {
     try {
       console.log('[API] GetReferralNotifications request:', { wallet, url: `${API_URL}/referral-notifications/${wallet}` });
-      const response = await axios.get(`${API_URL}/referral-notifications/${wallet}`);
+      const response = await axios.get(`${API_URL}/referral-notifications/${wallet}`, {
+        timeout: 10000, // 10 second timeout
+      });
       console.log('[API] GetReferralNotifications response:', response.data);
-      return response.data;
+      
+      // Ensure the response has the expected structure
+      if (!response.data || typeof response.data !== 'object') {
+        throw new Error('Invalid response format from server');
+      }
+      
+      return {
+        notifications: response.data.notifications || [],
+        count: response.data.count || 0
+      };
     } catch (error: any) {
       console.error('[API] GetReferralNotifications error:', {
         message: error.message,
@@ -321,6 +332,13 @@ class API {
         status: error.response?.status,
         url: error.config?.url
       });
+      
+      // Return empty data instead of throwing to prevent app crashes
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        console.warn('[API] Request timeout, returning empty notifications');
+        return { notifications: [], count: 0 };
+      }
+      
       throw error;
     }
   }
@@ -328,9 +346,21 @@ class API {
   async getReferralMiningRewards(wallet: string): Promise<{ miningRewards: any[]; totalMiningRewards: number; count: number }> {
     try {
       console.log('[API] GetReferralMiningRewards request:', { wallet, url: `${API_URL}/referral-mining-rewards/${wallet}` });
-      const response = await axios.get(`${API_URL}/referral-mining-rewards/${wallet}`);
+      const response = await axios.get(`${API_URL}/referral-mining-rewards/${wallet}`, {
+        timeout: 10000, // 10 second timeout
+      });
       console.log('[API] GetReferralMiningRewards response:', response.data);
-      return response.data;
+      
+      // Ensure the response has the expected structure
+      if (!response.data || typeof response.data !== 'object') {
+        throw new Error('Invalid response format from server');
+      }
+      
+      return {
+        miningRewards: response.data.miningRewards || [],
+        totalMiningRewards: response.data.totalMiningRewards || 0,
+        count: response.data.count || 0
+      };
     } catch (error: any) {
       console.error('[API] GetReferralMiningRewards error:', {
         message: error.message,
@@ -338,6 +368,13 @@ class API {
         status: error.response?.status,
         url: error.config?.url
       });
+      
+      // Return empty data instead of throwing to prevent app crashes
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        console.warn('[API] Request timeout, returning empty mining rewards');
+        return { miningRewards: [], totalMiningRewards: 0, count: 0 };
+      }
+      
       throw error;
     }
   }

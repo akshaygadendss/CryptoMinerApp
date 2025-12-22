@@ -7,6 +7,7 @@ import {
   ImageBackground,
   ActivityIndicator,
   TouchableOpacity,
+  RefreshControl,
 } from 'react-native';
 import { COLORS } from '../constants/mining';
 import api from '../services/api';
@@ -45,30 +46,67 @@ type CombinedNotification = ReferralNotification | MiningRewardNotification;
 const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation }) => {
   const [notifications, setNotifications] = useState<CombinedNotification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [wallet, setWallet] = useState<string>('');
   const [totalReferralRewards, setTotalReferralRewards] = useState<number>(0);
+  const [connectionError, setConnectionError] = useState<string>('');
 
   useEffect(() => {
     loadNotifications();
   }, []);
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadNotifications();
+    setRefreshing(false);
+  };
+
   const loadNotifications = async () => {
     try {
+      setLoading(true);
+      setConnectionError('');
+      console.log('[NotificationsScreen] Starting to load notifications...');
+      
       const storedWallet = await api.getStoredWallet();
+      console.log('[NotificationsScreen] Stored wallet:', storedWallet);
+      
       if (storedWallet) {
         setWallet(storedWallet);
         
-        // Fetch both types of notifications
-        const referralData = await api.getReferralNotifications(storedWallet);
-        const miningData = await api.getReferralMiningRewards(storedWallet);
+        console.log('[NotificationsScreen] Fetching referral notifications...');
+        // Fetch both types of notifications with individual error handling
+        let referralData = { notifications: [], count: 0 };
+        let miningData = { miningRewards: [], totalMiningRewards: 0, count: 0 };
+        let hasError = false;
+        
+        try {
+          referralData = await api.getReferralNotifications(storedWallet);
+          console.log('[NotificationsScreen] Referral data received:', referralData);
+        } catch (error: any) {
+          console.error('[NotificationsScreen] Error fetching referral notifications:', error.message);
+          hasError = true;
+          setConnectionError('Unable to fetch some notifications. Please check your connection.');
+          // Continue with empty data instead of failing completely
+        }
+        
+        try {
+          console.log('[NotificationsScreen] Fetching mining rewards...');
+          miningData = await api.getReferralMiningRewards(storedWallet);
+          console.log('[NotificationsScreen] Mining data received:', miningData);
+        } catch (error: any) {
+          console.error('[NotificationsScreen] Error fetching mining rewards:', error.message);
+          hasError = true;
+          setConnectionError('Unable to fetch some notifications. Please check your connection.');
+          // Continue with empty data instead of failing completely
+        }
         
         // Mark each notification with its type
-        const signupNotifications: ReferralNotification[] = referralData.notifications.map(n => ({
+        const signupNotifications: ReferralNotification[] = (referralData.notifications || []).map(n => ({
           ...n,
           type: 'signup' as const
         }));
         
-        const miningNotifications: MiningRewardNotification[] = miningData.miningRewards.map(n => ({
+        const miningNotifications: MiningRewardNotification[] = (miningData.miningRewards || []).map(n => ({
           ...n,
           type: 'mining' as const
         }));
@@ -78,17 +116,27 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation })
           new Date(b.claimedAt).getTime() - new Date(a.claimedAt).getTime()
         );
         
+        console.log('[NotificationsScreen] Combined notifications:', combined.length);
         setNotifications(combined);
         
         // Calculate total rewards
-        const signupTotal = referralData.notifications.reduce((sum, n) => sum + n.rewardTokens, 0);
-        const miningTotal = miningData.totalMiningRewards;
-        setTotalReferralRewards(signupTotal + miningTotal);
+        const signupTotal = (referralData.notifications || []).reduce((sum, n) => sum + (n.rewardTokens || 0), 0);
+        const miningTotal = miningData.totalMiningRewards || 0;
+        const totalRewards = signupTotal + miningTotal;
+        console.log('[NotificationsScreen] Total rewards calculated:', { signupTotal, miningTotal, totalRewards });
+        setTotalReferralRewards(totalRewards);
+        
+        if (!hasError) {
+          setConnectionError('');
+        }
       } else {
+        console.log('[NotificationsScreen] No wallet found, redirecting to Signup');
         navigation.replace('Signup');
       }
     } catch (error: any) {
+      console.error('[NotificationsScreen] General error in loadNotifications:', error);
       const errorMessage = error.response?.data?.error || error.message || 'Failed to load notifications';
+      setConnectionError(errorMessage);
       showErrorToast(errorMessage);
     } finally {
       setLoading(false);
@@ -96,8 +144,9 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation })
   };
 
   const renderNotification = ({ item }: { item: CombinedNotification }) => {
-    const date = new Date(item.claimedAt).toLocaleDateString();
-    const time = new Date(item.claimedAt).toLocaleTimeString();
+    const claimedAt = item.claimedAt || new Date().toISOString();
+    const date = new Date(claimedAt).toLocaleDateString();
+    const time = new Date(claimedAt).toLocaleTimeString();
 
     if (item.type === 'signup') {
       return (
@@ -108,10 +157,10 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation })
           <View style={styles.contentContainer}>
             <Text style={styles.title}>Referral Signup Reward!</Text>
             <Text style={styles.message}>
-              <Text style={styles.highlight}>{item.referredWallet.slice(0, 8)}...</Text>
+              <Text style={styles.highlight}>{(item.referredWallet || '').slice(0, 8)}...</Text>
               {' '}used your referral code
             </Text>
-            <Text style={styles.reward}>+{item.rewardTokens} TOKENS</Text>
+            <Text style={styles.reward}>+{item.rewardTokens || 0} TOKENS</Text>
             <Text style={styles.timestamp}>{date} at {time}</Text>
           </View>
         </View>
@@ -126,10 +175,10 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation })
           <View style={styles.contentContainer}>
             <Text style={styles.title}>Mining Referral Reward!</Text>
             <Text style={styles.message}>
-              <Text style={styles.highlight}>{item.referredWallet.slice(0, 8)}...</Text>
+              <Text style={styles.highlight}>{(item.referredWallet || '').slice(0, 8)}...</Text>
               {' '}completed a mining session
             </Text>
-            <Text style={styles.reward}>+{item.session10percentTokens.toFixed(4)} TOKENS (10%)</Text>
+            <Text style={styles.reward}>+{(item.session10percentTokens || 0).toFixed(4)} TOKENS (10%)</Text>
             <Text style={styles.timestamp}>{date} at {time}</Text>
           </View>
         </View>
@@ -167,7 +216,24 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation })
             <Text style={styles.backButtonText}>← Back</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>🔔 Notifications</Text>
+          <TouchableOpacity
+            style={styles.refreshButton}
+            onPress={loadNotifications}
+            disabled={loading}
+          >
+            <Text style={styles.refreshButtonText}>🔄</Text>
+          </TouchableOpacity>
         </View>
+
+        {/* Connection Error Banner */}
+        {connectionError && (
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorText}>⚠️ {connectionError}</Text>
+            <TouchableOpacity onPress={loadNotifications} style={styles.retryButton}>
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* SIMPLE • SMALL • MATCHES BACK BUTTON STYLE */}
         {notifications.length > 0 && (
@@ -193,6 +259,14 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation })
             keyExtractor={(item) => item._id}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={COLORS.cyan}
+                colors={[COLORS.cyan]}
+              />
+            }
           />
         )}
       </View>
@@ -224,6 +298,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 20,
     marginTop: 20,
   },
@@ -234,7 +309,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: COLORS.cyan,
-    marginRight: 15,
   },
   backButtonText: {
     color: COLORS.text,
@@ -245,12 +319,61 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: COLORS.text,
+    flex: 1,
+    textAlign: 'center',
+    marginHorizontal: 10,
+  },
+  refreshButton: {
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.cyan,
+  },
+  refreshButtonText: {
+    color: COLORS.text,
+    fontSize: 18,
+    fontWeight: '600',
   },
 
   loadingText: {
     fontSize: 16,
     color: COLORS.textLight,
     marginTop: 10,
+  },
+
+  /* Error Banner */
+  errorBanner: {
+    backgroundColor: 'rgba(255, 0, 0, 0.1)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#ff4444',
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    marginBottom: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#ff6666',
+    flex: 1,
+    marginRight: 10,
+  },
+  retryButton: {
+    backgroundColor: 'rgba(255, 68, 68, 0.2)',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#ff4444',
+  },
+  retryButtonText: {
+    color: '#ff6666',
+    fontSize: 12,
+    fontWeight: '600',
   },
 
   /* NEW SIMPLE TOTAL REWARDS CARD */
